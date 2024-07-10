@@ -8,7 +8,7 @@ Author: lidehu
 
 
 ## 模型结构
-- 编码器:一个输入卷积层input_cov,256个位置token和36个特殊token,24层Transformer,末尾为投影层预测头.
+- 编码器:一个输入卷积层input_cov,256个位置token和36个特殊token,24层Transformer(18dense+6experts),末尾为投影层预测头.
 - 解码器:256个位置token和36个占位token,18个condtionTransformer层,6层Transformer,输出卷积层out_cov.
 ## 数据流动流程：
 - 编码器:img(bs,3,256,256)->input_cov(img)->(256,bs,1024)->add(256个位置token).
