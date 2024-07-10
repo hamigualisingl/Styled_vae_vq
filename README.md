@@ -97,7 +97,5 @@ If you find this repository useful, please use the following BibTeX entry for ci
 }
 ```
 
-## 🌟Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=deepglint/ALIP&type=Date)](https://star-history.com/#deepglint/ALIP&Date)
 
