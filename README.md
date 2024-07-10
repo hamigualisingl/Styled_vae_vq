@@ -8,11 +8,11 @@ Author: lidehu
 
 
 ## 模型结构
-- 编码器：一个输入卷积层input_cov，256个位置token和36个特殊token，24层Transformer,末尾为俩个mean,std预测头。
+- 编码器：一个输入卷积层input_cov，256个位置token和36个特殊token，24层Transformer,末尾为投影层预测头。
 - 解码器：256个位置token和36个占位token，18个condtionTransformer层，6层Transformer，输出卷积层out_cov。
 ## 数据流动流程：
 - 编码器：img(bs,3,256,256)->input_cov(img)->(256,bs,1024)->add(256个位置token)
-->cat(x,36个特殊token)->Transformer->取出后36个token作为condtion
+->cat(x,36个特殊token)->Transformer->取出后36个token降维度作为condtion
 - 解码器：256个位置token->condtionTransformer->Transformer->取后256个token->out_cov->重建损失
 - 条件添加方式如下:
     ```
@@ -20,7 +20,7 @@ Author: lidehu
         x = r(x,conditon[index*2:(index+1)*2], index)
     ```
     ```
-    zeros_like_x = torch.zeros_like(x)(36+256,bs,dim)
+    zeros_like_x = torch.zeros_like(x)#(36+256,bs,dim)
     zeros_like_x[index*2:(index+1)*2]=zeros_like_x[index*2:(index+1)*2]+ condation
     x=x+ zeros_like_x
     norm_hidden_states = self.norm1(x,self.ln_1(self.condation_1(x[index*2])+condation[0]))
@@ -29,13 +29,16 @@ Author: lidehu
        
     ```
 - 条件添加方案解释：整体添加方式类似于stylegan2的w+，相关stylegan2W+的分析不再赘述。为了进一步加强生成序列的纠缠关联有逻辑，和促使36个token，是从高到低的属性组合，使用了占位token，当前条件token2需要与占位token相加，而占位token到达本层时候，已经被前面的条件token改变，影响。因此如果36个token，是从低到高的属性组合，或者没有相关性，解码器复原图片变得很困难，浓浓的眉毛属性影响到性别是男性属性，这个会给复原带来很大难度，但如果先指明这个人是男性属性然后影响眉毛属性，这就合理些。
-## Instructions
+## 训练流程
+- 由于任务比较困难,采取俩阶段训练策略
+- 阶段一:编码器输出连续值，添加噪音后送入解码器
+- 阶段二:通过k-means聚类，得到词表，编码器(固定)输出连续值->量化
 - ### Environment installation
 
     ```
     pip install -r requirments.txt
     ```
-- ### Dataset preparation
+- ### 
     
     1、Download YFCC15M
 
@@ -82,20 +85,6 @@ This project is based on [open_clip](https://github.com/mlfoundations/open_clip)
 ## License
 
 This project is released under the MIT license. Please see the [LICENSE](LICENSE) file for more information.
-
-## Citation
-If you find this repository useful, please use the following BibTeX entry for citation.
-
-```latex
-@misc{yang2023alip,
-      title={ALIP: Adaptive Language-Image Pre-training with Synthetic Caption}, 
-      author={Kaicheng Yang and Jiankang Deng and Xiang An and Jiawei Li and Ziyong Feng and Jia Guo and Jing Yang and Tongliang Liu},
-      year={2023},
-      eprint={2308.08428},
-      archivePrefix={arXiv},
-      primaryClass={cs.CV}
-}
-```
 
 
 
