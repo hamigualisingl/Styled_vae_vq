@@ -8,8 +8,8 @@ Author: lidehu 2201210265@stu.pku.edu.cn
 应对图像理解与自回归生成难题,比如:理解-注意力分散,出现幻觉;生成-数据不对齐,下一个token概率分布比较平均,自回归生成困难,提出Styled_vae_vq,将图像按序离散成36个从高级到低级的属性token,力求编码器提供了合理的序列,而非解码器强大的拟和能力.使用时候可以和其他vqvae拼接.
 
 ## 模型结构
-- 编码器:一个输入卷积层input_cov,256个位置token和36个特殊token,24层Transformer(18dense+6experts),末尾为投影层.编码器参数远大于解码器参数.
-- 解码器:256个位置token和36个占位token,18个condtionTransformer层,6层Transformer,输出卷积层out_cov.
+- 编码器:1024维度.一个输入卷积层input_cov,256个位置token和36个特殊token,24层Transformer(18dense+6experts),末尾为投影层.编码器参数远大于解码器参数.
+- 解码器:768维度.256个位置token和36个占位token,18个condtionTransformer层,6层Transformer,输出卷积层out_cov.
 ## 数据流动流程：
 - 编码器:img(bs,3,256,256)->input_cov(img)->(256,bs,1024)->add(256个位置token).
 ->cat(x,36个特殊token)->Transformer->取出后36个token降维度作为condtion.
