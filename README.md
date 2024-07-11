@@ -43,37 +43,33 @@ Author: lidehu 2201210265@stu.pku.edu.cn
 
 - ### Pretrained Model Weight
 
-    ，很快放出来，目前第一阶段已经训练完成,重建效果不错(目前模型大小为8.9G,主要是编码器较大),后面会在laion400m进一步训练.#######下面的alip.You can download the pretrained model weight from [Google Drive](https://drive.google.com/file/d/1AqSHisCKZOZ16Q3sYguK6zIZIuwwEriE/view?usp=share_link) or [BaiduYun](https://pan.baidu.com/s/10dFfvGMWeaTXUyrZlZlCEw?pwd=xftg), and you can find the traning log in [Google Drive](https://drive.google.com/file/d/1I8gdSQCJAfFamDcVztwW8EQIc_OOK8Xh/view?usp=share_link) or [BaiduYun](https://pan.baidu.com/s/1oz0UVzX2N0Sri7MfwR-kog?pwd=7ki7)
+    数据集:主要是在cc3m随机抽选的56万张图片训,然后在imagenet等其他数据进一步训练.很快放出来,目前第一阶段(56万张图片)已经训练完成,训练数据外的图片重建效果不错(目前模型大小为8.9G,主要是编码器较大),后面会在laion400m进一步训练.
 
 - ### Training
 
     Start training by run
     ```
-    bash scripts/train_yfcc15m_B32_ALIP.sh
+    bash /mnt/data/user/lidehu/vae/ALIP/run_zeroshot.sh 64 1e-4 /mnt/data/user/lidehu/vae/ALIP/out_put_stage1_6expert_std_noise_1_pect_1  1024 200#注意数据集路径更换!
     ```
 
-- ### Evaluation
+- ### Use
 
-    Evaluate zero shot cross-modal retireval
-
-    ```
-    bash run_retrieval.sh
-    ```
-    Evaluate zero shot classification
+  
 
     ```
-    bash run_zeroshot.sh
+    python  how_to_use.py#注意图片路径和模型路径更换!
     ```
+   
 
 
 
 ## Acknowledgement
 
-This project is based on [open_clip](https://github.com/mlfoundations/open_clip) and [OFA](https://github.com/OFA-Sys/OFA), thanks for their works.
+感谢soul app自然语言算法组的支持,宽松的研究环境,富裕的计算资源.
 
 ## License
 
-This project is released under the MIT license. Please see the [LICENSE](LICENSE) file for more information.
+.
 
 
 
