@@ -29,11 +29,11 @@ Author: lidehu 2201210265@stu.pku.edu.cn
     x = x + self.mlp(self.norm2(x,self.ln_2(self.condation_2(x[index*2+1])+condation[1])))
        
     ```
-- 条件添加方案解释:整体添加方式类似于stylegan2的w+,相关stylegan2W+的分析不再赘述.为了进一步加强生成序列的纠缠关联有逻辑,和促使36个token,是从高到低的属性组合,使用了占位token,条件token需要与对应的占位token相加,而占位token到达本层时候,已经被前面的条件token改变,影响.因此如果36个token,是从低到高的属性组合,或者没有相关性,解码器复原图片变得很困难,浓浓的眉毛属性影响到性别是男性属性,这个会给复原带来很大难度,但如果先指明这个人是男性属性然后影响眉毛属性,这就合理些.
+- 条件添加方案解释:整体添加方式类似于stylegan2的w+,相关stylegan2W+的分析不再赘述.为了进一步加强生成序列的纠缠关联有逻辑,和促使36个token,是从高到低的属性组合,使用了占位token.条件token需要与对应的占位token相加,而占位token到达本层时候,已经被前面的条件token改变,影响.因此如果36个token,是从低到高的属性组合,或者没有相关性,解码器复原图片变得很困难.比如:浓浓的眉毛属性影响到性别是男性属性,这个会给复原带来很大难度,但如果先指明这个人是男性属性然后影响眉毛属性,这就合理些.
 ## 训练流程
 - 由于任务比较困难,采取俩阶段训练策略.未采用fsq之类的操作原因如下:我们是要得到一个合理的序列或者特征,不能是依靠解码器拟合回去(需要训很多epoch).
-- 阶段一:编码器输出连续值,添加噪音后送入解码器
-- 阶段二:通过k-means聚类,得到词表,编码器(固定)输出连续值->量化
+- 阶段一:编码器输出连续值,添加噪音后送入解码器.
+- 阶段二:通过k-means聚类,得到词表,编码器(固定)输出连续值->量化.
 - ### Environment installation
 
     ```
@@ -43,13 +43,13 @@ Author: lidehu 2201210265@stu.pku.edu.cn
 
 - ### Pretrained Model Weight
 
-    数据集:主要是在cc3m随机抽选的56万张图片训,然后在imagenet等其他数据进一步训练.很快放出来,目前第一阶段(56万张图片)已经训练完成,训练数据外的图片重建效果不错(目前模型大小为8.9G,主要是编码器较大),后面会在laion400m进一步训练.
+    数据集:主要是在cc3m随机抽选的56万张图片训练,然后在imagenet等其他数据进一步训练.很快放出来,目前第一阶段(56万张图片)已经训练完成,训练数据外的图片重建效果不错(泛化能力)(目前模型大小为8.9G,主要是编码器较大),后面会在laion400m进一步训练.
 
 - ### Training
 
     Start training by run
     ```
-    bash /mnt/data/user/lidehu/vae/ALIP/run_zeroshot.sh 64 1e-4 /mnt/data/user/lidehu/vae/ALIP/out_put_stage1_6expert_std_noise_1_pect_1  1024 200#注意数据集路径更换!
+    bash Styled_vae_vq/run.sh 64 1e-4 /mnt/data/user/lidehu/vae/ALIP/out_put_stage1_6expert_std_noise_1_pect_1  1024 200#注意数据集路径更换!
     ```
 
 - ### Use
