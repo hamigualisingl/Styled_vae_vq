@@ -1,6 +1,6 @@
 # Styled_vae_vq
 <div align="center">
-Author: lidehu
+Author: lidehu 2201210265@stu.pku.edu.cn
     在soul app 实习期间的工作
 </div>
 
