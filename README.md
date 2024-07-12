@@ -13,7 +13,7 @@ Author: lidehu 2201210265@stu.pku.edu.cn
 - 解码器:768/512维度.256个位置token和36个占位token,18个condtionTransformer层,6层Transformer,输出卷积层out_cov.
 ## 数据流动流程：
 - 编码器:img(bs,3,256,256)->input_cov(img)->(256,bs,1024)->add(256个位置token).
-->cat(x,36个特殊token)->Transformer->取出后36个token降维度作为condtion.
+->cat(x,36个特殊token)->Transformer->取出后36个token降维度至128作为condtion.
 - 解码器:256个位置token->condtionTransformer->Transformer->取后256个token->out_cov->重建损失,感知损失.
 - 条件添加方式如下:
     ```
