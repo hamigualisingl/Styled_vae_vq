@@ -28,14 +28,14 @@ val_aug = transforms.Compose([
 ])
 device =  'cuda'
 epoch_number = 97
-file_path = "/mnt/data/user/lidehu/vae/ALIP/out_put_stage1_6expert_std_noise_0.01_pect_1/model_{:d}.pt".format(epoch_number)
+file_path = "/mnt/data/user/lidehu/vae/ALIP/out_put_stage1_6expert_std_noise_0.1_pect_1/model_{:d}.pt".format(epoch_number)
 model_alip =VQVAE_Transformer_vit_sd3_hug_4096(width=1024, layers=24, heads=16, mlp_ratio=4.0)
 state_dict = get_state_dict(file_path)
 model_alip.load_state_dict(state_dict, strict=True)
 # 确保在推理前模型处于评估模式
 model_alip.to(device)  
 model_alip.eval()
-image_path = ["/mnt/data/zhendingcheng/old_3090/lavis_dataset/lavis/CC3M_595K/images/GCC_train_000000000.jpg", "/mnt/data/zhendingcheng/old_3090/lavis_dataset/lavis/CC3M_595K/images/GCC_train_000000001.jpg","/mnt/data/zhendingcheng/old_3090/lavis_dataset/lavis/CC3M_595K/images/GCC_train_000000015.jpg",'/mnt/data/user/lidehu/VAR/WechatIMG37.jpg','/mnt/data/user/lidehu/VAR/resized_image.jpg','/mnt/data/user/lidehu/VAR/image.jpg','/mnt/data/user/lidehu/VAR/20240527-3.jpg',"/mnt/data/user/lidehu/VAR/20240527-4.jpg","/mnt/data/user/lidehu/VAR/20240527-2.jpg"]  # 替换为你的图片路径
+image_path = ['/mnt/data/user/lidehu/VAR/WechatIMG37.jpg','/mnt/data/user/lidehu/VAR/resized_image.jpg','/mnt/data/user/lidehu/VAR/image.jpg','/mnt/data/user/lidehu/VAR/20240527-3.jpg',"/mnt/data/user/lidehu/VAR/20240527-4.jpg","/mnt/data/user/lidehu/VAR/20240527-2.jpg"]  # 替换为你的图片路径
 
 for i in range(len(image_path)):
     fin=i
