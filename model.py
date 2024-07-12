@@ -393,49 +393,6 @@ class vit_32768_decoder(nn.Module):
         x = F.silu(x)
         x = self.conv_out(x)#一个卷积层
         return x
-class vit_New_Cov_decoder(nn.Module):
-    def __init__(self, width: int, layers: int=36, heads: int=8,  mlp_ratio: float = 4.0,sd3: int=0, act_layer: Callable = nn.GELU):
-        super().__init__()
-        self.width = width
-        self.layers = layers
-        scale = width ** -0.5
-        
-        self.positional_embedding = nn.Parameter(scale * torch.randn(292, width))
-        self.resblocks = nn.ModuleList([
-            Styled_New_VQvae_Block_stled(width, heads, mlp_ratio, act_layer=act_layer)
-            for _ in range(layers)
-        ])
-        self.final_block=nn.ModuleList([
-            ResidualAttentionBlock(width, heads, mlp_ratio, act_layer=act_layer)
-            for _ in range(4)#加了6层
-        ])#
-        self.lin_post = LayerNorm(width)
-        self.pre_post = LayerNorm(width)
-        self.pixel_decoder = Decoder(OmegaConf.create(
-            {"channel_mult": [1, 1, 2, 2, 4],
-             "num_resolutions": 5,
-             "dropout": 0.0,
-             "hidden_channels": 128,
-             "num_channels": 3,
-             "num_res_blocks": 2,
-             "resolution": 256,
-             "z_channels": 768}))
-             #x=torch.rand((1, 768, 16, 16))
-    def forward(self, conditon: torch.Tensor, attn_mask: Optional[torch.Tensor] = None):
-        x=self.positional_embedding.unsqueeze(1).repeat(1, conditon.shape[1], 1).to(conditon.dtype)
-        x[0:36]+=conditon
-        x=self.pre_post(x)
-       #e([292, 12, 768])
-        for index, r in enumerate(self.resblocks):
-            x = checkpoint(r, x,conditon[index], attn_mask)
-            #x = r(x,conditon[index*2:(index+1)*2], attn_mask=attn_mask)
-        # #((12,3,256,256))      注意卷积的结构是bs,channel,形状
-        for index, r in enumerate(self.final_block):
-            x = checkpoint(r, x, attn_mask)####256 bs 768
-        bs=x.shape[1]
-        x=self.lin_post(x[-256:,:,:]).permute(1,2,0).reshape(bs,-1,16, 16)   #256 bs  768 patch级别的像素归位
-        return  self.pixel_decoder(x)
-
 class VisualTransformer(nn.Module):
     def __init__(
             self,
