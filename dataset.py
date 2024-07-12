@@ -12,13 +12,9 @@ from torchvision import transforms
 # Set this tp `True` and run this script to convert dataset to LMDB format
 TO_LMDB = False
 
-# CELEBA_DIR = 'data/celebA/img_align_celeba'
-# CELEBA_LMDB_PATH = 'data/celebA/img_align_celeba.lmdb'   /mnt/data/zhendingcheng/old_3090/lavis_dataset/lavis/CC3M_595K/images
-CELEBA_HQ_DIR = '/mnt/data/jingli/vae/VQ-VAE/DL-Demos/dldemos/VQVAE/data/celeba_hq_256'
-# CELEBA_HQ_LMDB_PATH = 'dldemos/VQVAE/data/celeba_hq_256.lmdb' /mnt/data/user/lidehu/lavis/CC3M_595K/images
 CC3M_595K_PATH = '/mnt/data/user/lidehu/lavis/CC3M_595K/images'
 file_path = '/mnt/data/user/lidehu/vae/filenames.json'
-# CC3M_595K_PATH = '/mnt/workspace/jingli/vae/VQ-VAE/DL-Demos/dldemos/VQVAE/data/celeba_hq_256'
+
 
 def normalize_01_into_pm1(x):  # normalize x from [0, 1] to [-1, 1] by (x*2) - 1
     return x.add(x).add_(-1)
