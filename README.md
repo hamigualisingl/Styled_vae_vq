@@ -67,7 +67,7 @@ Author: lidehu 2201210265@stu.pku.edu.cn
 
 感谢soul app自然语言算法组的支持,宽松的研究环境,富裕的计算资源.
 
-## License
+## 重建效果 #注意没有添加对抗损失
 
 .
 
