@@ -241,7 +241,7 @@ class ResidualAttentionBlock_expert(nn.Module):
         x = x + self.ln_attn(self.attention(self.ln_1(x), attn_mask=attn_mask))#([516, 516]) torch.float32
         #x = x + self.mlp(self.ln_2(x))
         tem=self.ln_2(x)
-        before=self.mlp(tem[0:257])#形状为256 ，bs,512
+        before=self.mlp(tem[0:257])#形状为257,bs,512
         last = torch.empty([36, x.shape[1], self.d_model], dtype=x.dtype, device=x.device)  # 预分配空间
         for i in range(36):
            last[i] = self.layers[i](tem[i+257])
