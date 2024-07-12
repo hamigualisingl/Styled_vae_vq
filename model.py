@@ -546,7 +546,7 @@ class VQVAE_Transformer_vit_sd3_hug_4096(nn.Module):
         mu = F.normalize(self.progject_mean(x[257:]).float() , dim=-1)
         noise = torch.randn_like(mu)*(mu.detach())######训练数据（1,4),(4,16希望输入2时候得到8,而不是其他稀奇古怪的值,数值上连续，属性上也是连续的
        ####添加噪音,其实是为了编码器给出的条件更有规律,数值相近,属性相近,减轻第二阶段固定编码解码器进行量化产生的损失影响.
-        return  (mu+noise).to(origin_dtype) ,mu.detach(),  mu.detach()#noise 1,0.1,0.001,
+        return  (mu+0.1*noise).to(origin_dtype) ,mu.detach(),  mu.detach()#noise 1,0.1,0.001,
     def decoder_forward(self, condtion: torch.Tensor):
         with torch.cuda.amp.autocast(True):
             x=self.decoder(condtion)
