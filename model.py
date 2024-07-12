@@ -9,7 +9,7 @@ from einops import reduce
 import torch.nn.functional as F
 from torch import nn
 from torch.utils.checkpoint import checkpoint
-##下面的是stylegan2的生成器,我用来作为解码器的,现在弃用了
+##下面的是stylegan2的生成器,作为解码器的,现在弃用了
 from torch import nn, einsum
 from torch import distributed as dist
 def swish(x):
