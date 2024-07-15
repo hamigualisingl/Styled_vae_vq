@@ -43,7 +43,7 @@ Author: lidehu 2201210265@stu.pku.edu.cn
 
 - ### Pretrained Model Weight
 
-    有多个版本,解码器有俩个版本(768/512),编码器输出(128/64).
+    有多个版本,解码器有俩个版本(768/512),编码器有俩个版本(输出128/64).
 
 - ### Training
 
