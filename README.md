@@ -43,7 +43,7 @@ Author: lidehu 2201210265@stu.pku.edu.cn
 
 - ### Pretrained Model Weight
 
-    数据集: YFCC15M+3M(私有数据集).有多个版本,解码器有俩个版本(768/512),编码器有俩个版本(输出128/64).
+    数据集: YFCC15M+3M(私有数据集).超参数:lr 1e-4;9epoch;bs 16*256;optim.AdamW,lr_scheduler "cosine".有多个版本,解码器有俩个版本(768/512),编码器有俩个版本(输出128/64).
 
 - ### Training
 
