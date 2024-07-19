@@ -15,18 +15,18 @@ Author: lidehu 2201210265@stu.pku.edu.cn
 - 解码器:768/512维度.256个位置token和36个占位token,18个condtionTransformer层,6层Transformer,输出卷积层out_cov.
 ## 数据流动流程：
 - 编码器:img(bs,3,256,256)->input_cov(img)->(256,bs,1024)->add(256个位置token).
-->cat(x,36个特殊token)->Transformer->取出后36个token降维度至128作为condtion.
-- 解码器:256个位置token->condtionTransformer->Transformer->取后256个token->out_cov->重建损失,感知损失.
+->cat(x,36个特殊token)->Transformer->取出后36个token降维度至128/64(制造信息瓶颈)作为condtion.
+- 解码器:256个位置token+36个占位token->condtionTransformer->Transformer->取后256个token->out_cov->重建损失,感知损失.
 - 条件添加方式如下:
     ```
     for index, r in enumerate(self.condtionTransformer):
-        x = r(x,conditon[index*2:(index+1)*2], index)
+        x = r(x,conditon[index*2:(index+1)*2], index)#每层添加俩个条件
     ```
     ```
     zeros_like_x = torch.zeros_like(x)#(36+256,bs,dim)
-    zeros_like_x[index*2:(index+1)*2]=zeros_like_x[index*2:(index+1)*2]+ condation
-    x=x+ zeros_like_x
-    norm_hidden_states = self.norm1(x,self.ln_1(self.condation_1(x[index*2])+condation[0]))
+    zeros_like_x[index*2:(index+1)*2]=zeros_like_x[index*2:(index+1)*2]+ condation  #条件和占位token相加
+    x=x+ zeros_like_x  #条件和占位token相加
+    norm_hidden_states = self.norm1(x,self.ln_1(self.condation_1(x[index*2])+condation[0]))#自适应归一化。条件token发挥作用前需要和占位token交互,这样后面条件token起什么作用受到前一个token牵扯
     x = x + self.attn1(norm_hidden_states, norm_hidden_states, norm_hidden_states, need_weights=False, attn_mask=attn_mask)[0]#([516, 516]) torch.float32
     x = x + self.mlp(self.norm2(x,self.ln_2(self.condation_2(x[index*2+1])+condation[1])))
        
