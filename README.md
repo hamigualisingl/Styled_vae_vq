@@ -25,7 +25,7 @@ Author: lidehu 2201210265@stu.pku.edu.cn
     ```
     zeros_like_x = torch.zeros_like(x)#(36+256,bs,dim)
     zeros_like_x[index*2:(index+1)*2]=zeros_like_x[index*2:(index+1)*2]+ condation  #条件和占位token相加
-    x=x+ zeros_like_x  #条件和占位token相加
+    x=x+ zeros_like_x  #条件和占位token相加,注意此时的占位token在前向过程中已经被之前的条件token影响.
     norm_hidden_states = self.norm1(x,self.ln_1(self.condation_1(x[index*2])+condation[0]))#自适应归一化。条件token发挥作用前需要和占位token交互,这样后面条件token起什么作用受到前一个token牵扯
     x = x + self.attn1(norm_hidden_states, norm_hidden_states, norm_hidden_states, need_weights=False, attn_mask=attn_mask)[0]#([516, 516]) torch.float32
     x = x + self.mlp(self.norm2(x,self.ln_2(self.condation_2(x[index*2+1])+condation[1])))
