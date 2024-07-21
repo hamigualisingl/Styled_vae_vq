@@ -46,7 +46,7 @@ Author: lidehu 2201210265@stu.pku.edu.cn
 
 - ### Pretrained Model Weight
 
-    数据集: YFCC15M(随机挑选7.3M)+3M(私有数据集).超参数:lr 1e-4;9epoch;bs 16*256;optim.AdamW,lr_scheduler "cosine".有多个版本,解码器有俩个版本(768/512),编码器有俩个版本(输出128/64).
+    数据集: YFCC15M(随机挑选7.3M)+3.3M(私有数据集)(最初实验在59w数据规模训练,在yfcc15m测试,重建效果挺不错,所以最终版本在1060w数据规模训练即可).超参数:lr 1e-4;9epoch;bs 16*256;optim.AdamW,lr_scheduler "cosine".有多个版本,解码器有俩个版本(768/512),编码器有俩个版本(输出128/64).
   [Google Drive](https://drive.google.com/file/d/1AqSHisCKZOZ16Q3sYguK6zIZIuwwEriE/view?usp=share_link)(版本:768,128)
 
 - ### Training
