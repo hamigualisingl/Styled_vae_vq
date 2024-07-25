@@ -116,3 +116,36 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+############如何聚合,执行上面代码后，执行这段代码
+# output = '/mnt/data/user/lidehu/vae/ALIP/feature'
+
+# # 假设 Rank 0 的编号为 0
+# for rank_0  in range(8):
+
+# # 获取所有 Rank 0 的特征文件
+#     feature_files = glob(os.path.join(output, f"img_feature_batch_*_rank_{rank_0}.pt"))
+
+# # 按照文件名中的批次编号排序文件列表
+#     feature_files.sort(key=lambda x: int(x.split('_')[-3].split('_')[-1]))
+#     print(len(feature_files))
+# # 初始化一个空列表来存放所有的特征
+#     all_features = []
+
+# # 遍历文件列表，读取并合并特征
+#     for feature_file in feature_files:
+#         features = torch.load(feature_file, map_location=torch.device('cpu'))
+#         all_features.append(features)
+
+# # 合并特征
+#     merged_features = torch.cat(all_features, dim=1)
+#     output_file = os.path.join('/mnt/data/user/lidehu/vae/ALIP/merge', f"merged_features_{rank_0}.pt")
+#     torch.save(merged_features, output_file)
+# # 打印合并后的特征张量的形状
+#     print("Merged Features Shape:", merged_features.shape)#36, 1330066, 128]
+#########结束   
+
+
+
+
+
