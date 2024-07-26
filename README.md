@@ -78,24 +78,32 @@ Author: lidehu 2201210265@stu.pku.edu.cn
 - 注意!没有添加对抗损失,模型也没有得到充分训练.因为图像的特性,模型要把位置对应的vqvae方案(改变其中一个token,解码后对应位置内容也会改变)作为最后一公里,提供了几乎一对一的映射关系后由普通vqvae去还原.
 - 分析:非自然图像,属性提取困难,还原有难度-河马(sd生成的图像),力扣界面.
 ---
-![原始图像]
-.![image](https://github.com/user-attachments/assets/ef0ac4fc-7e4a-4c76-b05b-fb0988a67621)
-![重建图像]![image](https://github.com/user-attachments/assets/e0f874aa-ae3d-4bb4-820f-02464f2b0572)
-![原始图像]![image](https://github.com/user-attachments/assets/7d4954b5-56ae-4376-8b43-af5f9bdb8bf0)
-![重建图像]![image](https://github.com/user-attachments/assets/a9667b03-98f7-451d-ba93-873d129dc7d6)
-![原始图像]![image](https://github.com/user-attachments/assets/a84b7f6a-98ae-4e1b-a9da-693ad89cfa9c)
-![重建图像]![image](https://github.com/user-attachments/assets/e93b503d-57e6-484a-a156-2ac2172e7d58)
-![原始图像]![image](https://github.com/user-attachments/assets/f299a918-2f28-4a4e-a9ea-ee5ae8e2f6ad)
-![重建图像]![image](https://github.com/user-attachments/assets/eccc9cca-843b-44ac-acb2-41bbefd39145)
-![原始图像]![image](https://github.com/user-attachments/assets/dba588a9-59ec-4874-9bea-2b0f86b8fbbb)
-![重建图像]![image](https://github.com/user-attachments/assets/cfe7b6df-81e4-470a-9726-0539ba1a0eee)
-![原始图像]![image](https://github.com/user-attachments/assets/07f77089-b755-43b3-ae73-03aa1fc42602)
-![重建图像]![image](https://github.com/user-attachments/assets/2b6619a3-e673-432c-934e-1ed542ae973a)
 
+### 图像示例
 
+| 原始图像 | 重建图像 |
+| --- | --- |
+| ![原始图像](https://github.com/user-attachments/assets/ef0ac4fc-7e4a-4c76-b05b-fb0988a67621) | ![重建图像](https://github.com/user-attachments/assets/e0f874aa-ae3d-4bb4-820f-02464f2b0572) |
 
+| 原始图像 | 重建图像 |
+| --- | --- |
+| ![原始图像](https://github.com/user-attachments/assets/7d4954b5-56ae-4376-8b43-af5f9bdb8bf0) | ![重建图像](https://github.com/user-attachments/assets/a9667b03-98f7-451d-ba93-873d129dc7d6) |
 
+| 原始图像 | 重建图像 |
+| --- | --- |
+| ![原始图像](https://github.com/user-attachments/assets/a84b7f6a-98ae-4e1b-a9da-693ad89cfa9c) | ![重建图像](https://github.com/user-attachments/assets/e93b503d-57e6-484a-a156-2ac2172e7d58) |
 
+| 原始图像 | 重建图像 |
+| --- | --- |
+| ![原始图像](https://github.com/user-attachments/assets/f299a918-2f28-4a4e-a9ea-ee5ae8e2f6ad) | ![重建图像](https://github.com/user-attachments/assets/eccc9cca-843b-44ac-acb2-41bbefd39145) |
+
+| 原始图像 | 重建图像 |
+| --- | --- |
+| ![原始图像](https://github.com/user-attachments/assets/dba588a9-59ec-4874-9bea-2b0f86b8fbbb) | ![重建图像](https://github.com/user-attachments/assets/cfe7b6df-81e4-470a-9726-0539ba1a0eee) |
+
+| 原始图像 | 重建图像 |
+| --- | --- |
+| ![原始图像](https://github.com/user-attachments/assets/07f77089-b755-43b3-ae73-03aa1fc42602) | ![重建图像](https://github.com/user-attachments/assets/2b6619a3-e673-432c-934e-1ed542ae973a) |
 
 ---
 
