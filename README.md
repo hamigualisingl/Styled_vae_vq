@@ -77,7 +77,6 @@ Author: lidehu 2201210265@stu.pku.edu.cn
 ## 重建效果 
 - 注意!没有添加对抗损失.因为图像的特性,模型要把位置对应的vqvae方案(改变其中一个token,解码后对应位置内容也会改变)作为最后一公里,提供了几乎一对一的映射关系后由普通vqvae去还原.
 - 分析:非自然图像,属性提取困难,还原有难度-河马(sd生成的图像),力扣界面.
-  ![teaser]
 ![image](https://github.com/user-attachments/assets/46ac2867-3ee0-4686-a24d-c0040d02298d)
 .
 
