@@ -87,6 +87,12 @@ Author: lidehu 2201210265@stu.pku.edu.cn
 ![重建图像]![image](https://github.com/user-attachments/assets/e93b503d-57e6-484a-a156-2ac2172e7d58)
 ![原始图像]![image](https://github.com/user-attachments/assets/f299a918-2f28-4a4e-a9ea-ee5ae8e2f6ad)
 ![重建图像]![image](https://github.com/user-attachments/assets/eccc9cca-843b-44ac-acb2-41bbefd39145)
+![原始图像]![image](https://github.com/user-attachments/assets/dba588a9-59ec-4874-9bea-2b0f86b8fbbb)
+![重建图像]![image](https://github.com/user-attachments/assets/cfe7b6df-81e4-470a-9726-0539ba1a0eee)
+![原始图像]![image](https://github.com/user-attachments/assets/07f77089-b755-43b3-ae73-03aa1fc42602)
+![重建图像]![image](https://github.com/user-attachments/assets/2b6619a3-e673-432c-934e-1ed542ae973a)
+
+
 
 
 
