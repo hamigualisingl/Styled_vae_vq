@@ -170,7 +170,7 @@ def kmeans_dist(
         num_clusters,
         distance='euclidean',
         tol=1e-4,
-        iteration_=500,
+        iteration_=50,
         device=torch.device('cpu'),
         rank=0,
         batch_size=8192
