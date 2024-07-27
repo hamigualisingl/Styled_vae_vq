@@ -35,4 +35,4 @@ print("开始啦")
 center  =kmeans_dist(X=features, num_clusters=k, device=map_location,rank=rank)
 print(center.shape)
 if rank==0:
-   torch.save(os.path.join(save_path, "k_means.pt"), center)
+   torch.save(center, os.path.join(save_path, "k_means.pt"))
