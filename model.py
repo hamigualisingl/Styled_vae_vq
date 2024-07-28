@@ -54,7 +54,8 @@ class VectorQuantizer(torch.nn.Module):
         codebook_loss = torch.mean((z_quantized - z.detach()) **2)
 
         loss = commitment_loss + codebook_loss
-        z_quantized = z + (z_quantized - z).detach()
+        #z_quantized = z + (z_quantized - z).detach()
+        z_quantized = z_quantized.detach() - z+z.detach()#反转,越接近,梯度越小，不使用一致性损失，不利于序列跳转
 
         # reshape back to match original input shape
         #z_quantized = rearrange(z_quantized, 'b h w c -> b c h w').contiguous()
@@ -63,7 +64,7 @@ class VectorQuantizer(torch.nn.Module):
             quantizer_loss=loss,
             commitment_loss=commitment_loss,
             codebook_loss=codebook_loss,
-            min_encoding_indices=min_encoding_indices.view(z_quantized.shape[0], z_quantized.shape[2], z_quantized.shape[3])
+            #min_encoding_indices=min_encoding_indices.view(z_quantized.shape[0], z_quantized.shape[2], z_quantized.shape[3])
         )
 
         return z_quantized, result_dict
