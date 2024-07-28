@@ -2,14 +2,17 @@ from collections import OrderedDict
 from dataclasses import dataclass
 import logging
 import math
+from einops import rearrange
 from typing import Tuple, Union, Callable, Optional
 import numpy as np
 import torch
+from typing import Mapping, Text, Tuple
+
 from einops import reduce
 import torch.nn.functional as F
 from torch import nn
 from torch.utils.checkpoint import checkpoint
-##下面的是stylegan2的生成器,作为解码器的,现在弃用了
+##下面的是stylegan2的生成器,我用来作为解码器的,现在弃用了
 from torch import nn, einsum
 from torch import distributed as dist
 def swish(x):
@@ -18,7 +21,61 @@ def swish(x):
 # from omegaconf import OmegaConf
 def log(t, eps = 1e-20):
     return torch.log(t.clamp(min = eps))
+class VectorQuantizer(torch.nn.Module):
+    def __init__(self,
+                 codebook_size: int = 1024,
+                 token_size: int = 256,
+                 commitment_cost: float = 0.25,
+                 use_l2_norm: bool = False,
+                 ):
+        super().__init__()
+        self.commitment_cost = commitment_cost
 
+        self.embedding = torch.nn.Embedding(codebook_size, token_size)
+        #self.embedding.weight.data.uniform_(-1.0 / codebook_size, 1.0 / codebook_size)
+        #self.use_l2_norm = use_l2_norm#true
+
+    # Ensure quantization is performed using f32
+    def forward(self, z: torch.Tensor) -> Tuple[torch.Tensor, Mapping[Text, torch.Tensor]]:
+        z = z.float()
+        #z = rearrange(z, 'b c h w -> b h w c').contiguous()
+        z_flattened = rearrange(z, 's b c -> (s b) c')
+        #z_flattened = rearrange(z, 'b h w c -> (b h w) c')
+
+        embedding = self.embedding.weight
+        d = torch.sum(z_flattened**2, dim=1, keepdim=True) + \
+            torch.sum(embedding**2, dim=1) - 2 * \
+            torch.einsum('bd,dn->bn', z_flattened, embedding.T)
+
+        min_encoding_indices = torch.argmin(d, dim=1) # num_ele
+        z_quantized = self.get_codebook_entry(min_encoding_indices).view(z.shape)
+        # compute loss for embedding
+        commitment_loss = self.commitment_cost * torch.mean((z_quantized.detach() - z) **2)
+        codebook_loss = torch.mean((z_quantized - z.detach()) **2)
+
+        loss = commitment_loss + codebook_loss
+        z_quantized = z + (z_quantized - z).detach()
+
+        # reshape back to match original input shape
+        #z_quantized = rearrange(z_quantized, 'b h w c -> b c h w').contiguous()
+
+        result_dict = dict(
+            quantizer_loss=loss,
+            commitment_loss=commitment_loss,
+            codebook_loss=codebook_loss,
+            min_encoding_indices=min_encoding_indices.view(z_quantized.shape[0], z_quantized.shape[2], z_quantized.shape[3])
+        )
+
+        return z_quantized, result_dict
+
+    def get_codebook_entry(self, indices):
+        if len(indices.shape) == 1:
+            z_quantized = self.embedding(indices)
+        elif len(indices.shape) == 2:
+            z_quantized = torch.einsum('bd,dn->bn', indices, self.embedding.weight)
+        else:
+            raise NotImplementedError
+        return z_quantized
 class Conv2dSame(nn.Conv2d):
     def calc_same_pad(self, i: int, k: int, s: int, d: int) -> int:
         return max((math.ceil(i / s) - 1) * s + (k - 1) * d + 1 - i, 0)
@@ -241,7 +298,7 @@ class ResidualAttentionBlock_expert(nn.Module):
         x = x + self.ln_attn(self.attention(self.ln_1(x), attn_mask=attn_mask))#([516, 516]) torch.float32
         #x = x + self.mlp(self.ln_2(x))
         tem=self.ln_2(x)
-        before=self.mlp(tem[0:257])#形状为257,bs,512
+        before=self.mlp(tem[0:257])#形状为257 ，bs,512
         last = torch.empty([36, x.shape[1], self.d_model], dtype=x.dtype, device=x.device)  # 预分配空间
         for i in range(36):
            last[i] = self.layers[i](tem[i+257])
@@ -336,7 +393,12 @@ class Styled_New_18Qvae_Block_stled(nn.Module):
         zeros_like_x = torch.zeros_like(x)
         zeros_like_x[index*2:(index+1)*2]=zeros_like_x[index*2:(index+1)*2]+ condation#
         x=x+ zeros_like_x#添加条件信息，注意，最开始就预留了位置token，由之前添加的属性信息发生相应变换
-        ######属性牵制，后面送来的属性信息，由前面的结果发生变化，后面nrom的shift对数据分布影响比这边的attion强。迫使最先送入的条件是高级属性
+        norm_hidden_states = self.norm1(x,self.ln_1(self.condation_1(x[index*2])+condation[0]))#调制  同时norm，解释在上面，第一个条件是经过前面条件的影响
+        x = x + self.attn1(norm_hidden_states, norm_hidden_states, norm_hidden_states, need_weights=False, attn_mask=attn_mask)[0]#([516, 516]) torch.float32
+        x = x + self.mlp(self.norm2(x,self.ln_2(self.condation_2(x[index*2+1])+condation[1])))#经过attention，第二个条件也被第一个条件影响了
+        return x
+    
+     ######属性牵制，使其连接密切，后面送来的属性信息，由前面的结果发生变化，后面nrom的shift对数据分布影响比这边的attion强。迫使最先送入的条件是高级属性
         ###假如后面的是高级属性，前面的是低级属性，那么这种情况将很难发生了，比如说：最后一个表示这个图片的类别是狗，第一个是第一块的像素，/
         #那么当最后一个条件送来时候，直接被前面的条件改变了，这是一种及其不对齐的情况，解码器会识别，并要求编码器给出合理的策略：最开始是高级属性，后面的是低级属性
         #######################这个是为了和sd3一致，但是参数太多,需要36层，放弃 
@@ -345,10 +407,6 @@ class Styled_New_18Qvae_Block_stled(nn.Module):
         # after_mlp = after_mlp.unsqueeze(0)  # Add batch dimension, shape becomes (1, 12, 768)
         # after_attion = after_attion.unsqueeze(0)
         #######################        增强属性的关联性，且使得属性ß级别从高到低
-        norm_hidden_states = self.norm1(x,self.ln_1(self.condation_1(x[index*2])+condation[0]))#调制  同时norm，解释在上面，第一个条件是经过前面条件的影响
-        x = x + self.attn1(norm_hidden_states, norm_hidden_states, norm_hidden_states, need_weights=False, attn_mask=attn_mask)[0]#([516, 516]) torch.float32
-        x = x + self.mlp(self.norm2(x,self.ln_2(self.condation_2(x[index*2+1])+condation[1])))#经过attention，第二个条件也被第一个条件影响了
-        return x
 
 class vit_32768_decoder(nn.Module):
     def __init__(self, width: int, layers: int=36, heads: int=12,  mlp_ratio: float = 4.0,sd3: int=0, act_layer: Callable = nn.GELU):
@@ -393,6 +451,7 @@ class vit_32768_decoder(nn.Module):
         x = F.silu(x)
         x = self.conv_out(x)#一个卷积层
         return x
+
 class VisualTransformer(nn.Module):
     def __init__(
             self,
@@ -451,20 +510,19 @@ class VisualTransformer(nn.Module):
             x = x @ self.proj
         return x
 
-
 class VQVAE_Transformer_vit_sd3_hug_4096(nn.Module):
-    def __init__(self, width: int, layers: int, heads: int=16,  mlp_ratio: float = 4.0, act_layer: Callable = nn.GELU,codebook:int=4096):
+    def __init__(self, width: int, layers: int, heads: int=16,  mlp_ratio: float = 4.0, act_layer: Callable = nn.GELU,codebook:int=4096,decoder_dim:int=768,emb_dim:int=128):
         super().__init__()
         self.width = width
         self.layers = layers
         self.grad_checkpointing = False
         scale = width ** -0.5
-        self.emb_dim=128   #压缩信息，使编码器和解码器不能顺利沟通，第二阶段也可以在这边量化时候。求近似值，可能也会方便些？误差会小
+        self.emb_dim=emb_dim   #设置信息瓶颈，使编码器和解码器不能顺利沟通，第二阶段也可以在这边量化时候。求近似值，可能也会方便些？误差会小
         self.positional_embedding = nn.Parameter(scale * torch.randn(257, width))
         self.query_embedding = nn.Parameter(scale * torch.randn(36, width))
         self.ln_ecoder_1 = LayerNorm(width)
         self.ln_before_project_ = LayerNorm(width)
-       
+        self.quantize = VectorQuantizer(194560,emb_dim)
         self.class_embedding = nn.Parameter(scale * torch.randn(1, self.width))
         self.resblocks = nn.ModuleList([
             ResidualAttentionBlock(width, heads, mlp_ratio, act_layer=act_layer)
@@ -474,9 +532,8 @@ class VQVAE_Transformer_vit_sd3_hug_4096(nn.Module):
             ResidualAttentionBlock_expert(width, heads, mlp_ratio, act_layer=act_layer)
             for _ in range(6)#加了12层
         ])
-        self.decoder_dim=768
-        #self.decoder_dim=512
-        self.progject_mean= nn.Linear(width, self.emb_dim)##
+        self.decoder_dim=decoder_dim
+        self.progject_mean= nn.Linear(width, self.emb_dim)##设置信息瓶颈,降低维度
         #self.progject_std= nn.Linear(width, self.emb_dim)
         self.afer_progject= nn.Linear(self.emb_dim, self.decoder_dim)##升维度，也可以作为连续值用作理解任务，经过升维后才送入解码器
         self.decoder=vit_32768_decoder(width=self.decoder_dim,sd3=1)
@@ -503,17 +560,23 @@ class VQVAE_Transformer_vit_sd3_hug_4096(nn.Module):
         mu = F.normalize(self.progject_mean(x[257:]).float() , dim=-1)
         noise = torch.randn_like(mu)*(mu.detach())######训练数据（1,4),(4,16希望输入2时候得到8,而不是其他稀奇古怪的值,数值上连续，属性上也是连续的
        ####添加噪音,其实是为了编码器给出的条件更有规律,数值相近,属性相近,减轻第二阶段固定编码解码器进行量化产生的损失影响.
-        return  (mu+0.1*noise).to(origin_dtype) ,mu.detach(),  mu.detach()#noise 1,0.1,0.001,
+        return  (mu+0.000*noise).to(origin_dtype) ,mu.detach(),  mu.detach()#noise 1,0.1,0.01,0.001, 0.0005根据数据量设定的
     def decoder_forward(self, condtion: torch.Tensor):
         with torch.cuda.amp.autocast(True):
             x=self.decoder(condtion)
         #  这里面的形状应该为256 bs  width
         return x.float()
-    def forward(self,img):
+    def forward(self,img,quantize=False):
         with torch.cuda.amp.autocast(True):
             feature,mu, log_var=self.encoder_forward(img)
+        if quantize:
+            feature,_=self.quantize(feature.float())
+        with torch.cuda.amp.autocast(True):
             after_project = self.afer_progject(feature)#   36 bs  128        下面的需要修改
         return self.decoder_forward(after_project),0#sd是0.000001 #轻微的控制下方差
+    # def forward(self,img):
+    #     #抽取特征时候用的
+    #     return self.encoder_forward(img)#sd是0.000001 #轻微的控制下方差
     def decoder_infer(self, condtion: torch.Tensor):
         x=self.decoder(condtion)
         #  这里面的形状应该为256 bs  width
@@ -537,7 +600,9 @@ class VQVAE_Transformer_vit_sd3_hug_4096(nn.Module):
         origin_dtype = x.dtype       
         mu = F.normalize(self.progject_mean(x[257:]), dim=-1)
         return  mu
-    def infer(self,img):
+    def infer(self,img,quantize=False):
         feature=self.encoder_infer(img)#.permute(1, 0, 2)
+        if quantize:
+            feature,_=self.quantize(feature.float())
         after_project = self.afer_progject(feature)#.permute(1, 0, 2)   36 bs  128        下面的需要修改
         return self.decoder_infer(after_project)
