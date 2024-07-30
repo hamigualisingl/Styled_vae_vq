@@ -538,7 +538,7 @@ class Stled_vae_vq_V2(nn.Module):
         mu_flattened = mu.view(-1, 128)
         b_normalized = F.normalize(self.V2.float())
         similarity =  torch.matmul(mu_flattened.float(), b_normalized.t().float())
-        similarity= F.softmax(similarity.float(), dim=-1)#控制,防止起飞,
+        similarity= similarity/torch.sum(similarity, dim=-1, keepdim=True)#线性加权，未使用softmax暂时没想好温控策略,这边也可以减少误差的影响,但是操作不当会增加
         weighted_sum = torch.matmul(similarity, self.V2)
         output = weighted_sum.view(mu.shape)
         ###############这边是为了减轻量化影响的, 保证含义是连续的,这样存在误差也无妨,本来就是总结图像，不指望他还原
@@ -579,7 +579,7 @@ class Stled_vae_vq_V2(nn.Module):
         mu_flattened = mu.view(-1, 128)
         b_normalized = F.normalize(self.V2.float())
         similarity =  torch.matmul(mu_flattened.float(), b_normalized.t().float())
-        similarity= F.softmax(similarity.float(), dim=-1)#控制,防止起飞,
+        similarity= similarity/torch.sum(similarity, dim=-1, keepdim=True)#线性加权，未使用softmax暂时没想好温控策略,这边也可以减少误差的影响,但是操作不当会增加
         weighted_sum = torch.matmul(similarity, self.V2)
         output = weighted_sum.view(mu.shape)
         ###############这边是为了减轻量化影响的, 保证含义是连续的,这样存在误差也无妨,本来就是总结图像，不指望他还原
