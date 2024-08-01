@@ -276,6 +276,7 @@ class VectorQuantizer(nn.Module):
 
         if shape is not None:
             if channel_first:
+                #ture
                 z_q = z_q.reshape(shape[0], shape[2], shape[3], shape[1])
                 # reshape back to match original input shape
                 z_q = z_q.permute(0, 3, 1, 2).contiguous()
@@ -473,9 +474,20 @@ if __name__ == "__main__":
         raise Exception("please check model weight")
     vq_model.load_state_dict(model_weight)
     image = Image.open('/mnt/data/user/lidehu/vae/ALIP/aul/how_original_image_7.jpg').convert('RGB')
-    x=img = transform(image).unsqueeze(0).to(device)
+    image2 = Image.open('/mnt/data/user/lidehu/vae/ALIP/aul/how_original_image_11.jpg').convert('RGB')
+    
+    img = transform(image).unsqueeze(0).to(device)
+    img2 = transform(image2).unsqueeze(0).to(device)
+    x = torch.cat((img, img2), dim=0)
     latent, _, [_, _, indices] = vq_model.encode(x)
-    samples = vq_model.decode_code(indices, latent.shape)
-    save_image(samples, "sample_.png", nrow=1, normalize=True, value_range=(-1, 1))
+    print(indices.shape)
+    b, _, h, w = latent.shape  # 获取批量大小和高度宽度，通道数在这里不重要
+    indices1 = indices.view(b, h, w) #测试
+    flat_indices = indices1.flatten(start_dim=0)
+    print(flat_indices==indices)
+    samples = vq_model.decode_code(flat_indices, latent.shape)
+    save_image(samples, "sample_.png", nrow=2, normalize=True, value_range=(-1, 1))
+    
+    
     
     
