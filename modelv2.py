@@ -391,11 +391,11 @@ class Styled_New_18Qvae_Block_stled(nn.Module):
     def forward(self, x: torch.Tensor,condation: torch.Tensor, index,attn_mask: Optional[torch.Tensor] = None):
         #condation的形状为2,bs，d_models,x形状为256，bs,d_models
         norm_hidden_states = self.norm1(x,self.ln_1(condation[0]))
-        x=torch.cat([torch.zeros(1, *x.shape[1:], device=x.device, dtype=x.dtype),x], dim=0)##条件先norm，然后参与交互
-        norm_hidden_states=torch.cat([self.ln_11(condation[0:1]),norm_hidden_states], dim=0)#条件先norm，然后参与交互
+        x=torch.cat([torch.zeros(2, *x.shape[1:], device=x.device, dtype=x.dtype),x], dim=0)##条件先norm，然后参与交互
+        norm_hidden_states=torch.cat([self.ln_11(condation[0:1]),self.ln_22(condation[1:2]),norm_hidden_states], dim=0)#条件先交互后norm，
         x = x + self.attn1(norm_hidden_states, norm_hidden_states, norm_hidden_states, need_weights=False, attn_mask=attn_mask)[0]#([516, 516]) torch.float32
         x = x + self.mlp(self.norm2(x,self.ln_2(condation[1])))
-        x=torch.cat([self.ln_22(condation[1:2]),x], dim=0)#
+     
         return x
     
 
