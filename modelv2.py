@@ -387,11 +387,16 @@ class Styled_New_18Qvae_Block_stled(nn.Module):
         return self.attn(x, x, x, need_weights=False, attn_mask=attn_mask)[0]
        
     def forward(self, x: torch.Tensor,condation: torch.Tensor, index,attn_mask: Optional[torch.Tensor] = None):
-        norm_hidden_states = self.norm1(x,self.ln_1(condation[0]))#调制  同时norm，解释在上面，第一个条件是经过前面条件的影响
+        #condation的形状为2,bs，d_models,x形状为256，bs,d_models
+        x=torch.cat([condation[0:1],x], dim=0)
+        norm_hidden_states = self.norm1(x,self.ln_1(condation[0]))
         x = x + self.attn1(norm_hidden_states, norm_hidden_states, norm_hidden_states, need_weights=False, attn_mask=attn_mask)[0]#([516, 516]) torch.float32
-        x = x + self.mlp(self.norm2(x,self.ln_2(condation[1])))#经过attention，第二个条件也被第一个条件影响了
+        x=torch.cat([condation[1:2],x], dim=0)
+        x = x + self.mlp(self.norm2(x,self.ln_2(condation[1])))
+         
         return x
-   
+    
+
 class vit_32768_decoder(nn.Module):
     def __init__(self, width: int, layers: int=36, heads: int=12,  mlp_ratio: float = 4.0,sd3: int=0, act_layer: Callable = nn.GELU):
         super().__init__()
@@ -399,9 +404,8 @@ class vit_32768_decoder(nn.Module):
         self.layers = layers
         scale = width ** -0.5
         self.heads=width//64
-        self.linear=nn.Linear(width,768)                    ##### 36个占位token,256个位置token
+        self.linear=nn.Linear(width,768)             
         self.positional_embedding = nn.Parameter(scale * torch.randn(256, width))
-        #36的占位token（后续会和对应的条件相加，占位token会因为前面的条件发生变化，迫使编码器给的前面的token是高级属性，后面的是低级属性）和256个位置token 
         self.resblocks = nn.ModuleList([
             Styled_New_18Qvae_Block_stled(width,self.heads, mlp_ratio, act_layer=act_layer)
             for _ in range(18)
@@ -412,9 +416,11 @@ class vit_32768_decoder(nn.Module):
         ])#
         self.lin_post = LayerNorm(width)
         self.pre_post = LayerNorm(width)
-        self.before_fc=nn.Linear(width,256)
-        self.ln_before_fc = LayerNorm(256)
-        self.fc = nn.Linear(256,16384,bias=False)#####V2版本
+        self.cov = nn.Conv2d(in_channels=3, out_channels=32, kernel_size=17, stride=1, padding=8)  # padding为8
+        self.ResnetBlock= ResnetBlock(32,32,num_groups=8)
+        self.norm_out = nn.GroupNorm(num_groups=8, num_channels=32, eps=1e-6, affine=True)
+        self.norm_in = nn.GroupNorm(num_groups=8, num_channels=32, eps=1e-6, affine=True)
+        self.conv_out = Conv2dSame(32, 3, kernel_size=3)
     def forward(self, conditon: torch.Tensor, attn_mask: Optional[torch.Tensor] = None):
         x=self.positional_embedding.unsqueeze(1).repeat(1, conditon.shape[1], 1).to(conditon.dtype)
         x=self.pre_post(x)
@@ -423,72 +429,18 @@ class vit_32768_decoder(nn.Module):
             x = checkpoint(r, x,conditon[index*2:(index+1)*2], index)
         for index, r in enumerate(self.final_block):
             x = checkpoint(r, x, attn_mask)####256 bs 768
-        x=self.lin_post(x)
-        x=self.ln_before_fc(self.before_fc(x))
-        #print(f'hhhhhhh{x.shape}')#e([256, 2, 256])
-        x=self.fc(x).permute(1, 0, 2).reshape(-1,16,16,16384)#bs,256,16384
-        x=F.softmax(x.float(), dim=-1)
+        bs=x.shape[1]
+        x=self.linear(self.lin_post(x[-256:,:,:])).reshape(256, bs, 3, 16, 16)   #256 bs  768 patch内像素级别的归位
+        x=x.permute(1, 2, 0, 3, 4).reshape(bs, 3, 16, 16, 16, 16).permute(0, 1, 2, 4, 3, 5).reshape(bs, 3, 256, 256)
+        #patch级别的归位 bs 3 256 16 16 
+        x= self.norm_in(self.cov(x))#一个卷积层
+        x=self.ResnetBlock(x)#里面有2个卷积层
+        x = self.norm_out(x)####
+        x = F.silu(x)
+        x = self.conv_out(x)#一个卷积层
         return x
 
-class VisualTransformer(nn.Module):
-    def __init__(
-            self,
-            image_size: int,
-            patch_size: int,
-            width: int,
-            layers: int,
-            heads: int,
-            mlp_ratio: float,
-            output_dim: int,
-            act_layer: Callable = nn.GELU
-    ):
-        super().__init__()
-        # self.image_size = to_2tuple(image_size)
-        # self.patch_size = to_2tuple(patch_size)
-        self.grid_size = (self.image_size[0] // self.patch_size[0], self.image_size[1] // self.patch_size[1])
-        self.output_dim = output_dim
-        self.conv1 = nn.Conv2d(in_channels=3, out_channels=width, kernel_size=patch_size, stride=patch_size, bias=False)
-
-        scale = width ** -0.5
-        self.class_embedding = nn.Parameter(scale * torch.randn(width))
-        self.positional_embedding = nn.Parameter(scale * torch.randn(self.grid_size[0] * self.grid_size[1] + 1, width))
-        self.ln_pre = LayerNorm(width)
-
-        self.transformer = Transformer(width, layers, heads, mlp_ratio, act_layer=act_layer)
-
-        self.ln_post = LayerNorm(width)
-        self.proj = nn.Parameter(scale * torch.randn(width, output_dim))
-
-    def lock(self, unlocked_groups=0, freeze_bn_stats=False):
-        assert unlocked_groups == 0, 'partial locking not currently supported for this model'
-        for param in self.parameters():
-            param.requires_grad = False
-
-    @torch.jit.ignore
-    def set_grad_checkpointing(self, enable=True):
-        self.transformer.grad_checkpointing = enable
-
-    def forward(self, x: torch.Tensor):
-        x = self.conv1(x)  # shape = [*, width, grid, grid]
-        x = x.reshape(x.shape[0], x.shape[1], -1)  # shape = [*, width, grid ** 2]
-        x = x.permute(0, 2, 1)  # shape = [*, grid ** 2, width]  #第一个是bs
-        x = torch.cat(
-            [self.class_embedding.to(x.dtype) + torch.zeros(x.shape[0], 1, x.shape[-1], dtype=x.dtype, device=x.device),
-             x], dim=1)  # shape = [*, grid ** 2 + 1, width]
-        x = x + self.positional_embedding.to(x.dtype)
-        x = self.ln_pre(x)
-
-        x = x.permute(1, 0, 2)  # NLD -> LND#########序列长度放在最外面
-        x = self.transformer(x)
-        x = x.permute(1, 0, 2)  # LND -> NLD
-
-        x = self.ln_post(x[:, 0, :])
-
-        if self.proj is not None:
-            x = x @ self.proj
-        return x
-
-class Stled_vae_vq_V2(nn.Module):
+class VQVAE_Transformer_vit_sd3_hug_4096(nn.Module):
     def __init__(self, width: int, layers: int, heads: int=16,  mlp_ratio: float = 4.0, act_layer: Callable = nn.GELU,codebook:int=4096,decoder_dim:int=768,emb_dim:int=128):
         super().__init__()
         self.width = width
@@ -497,12 +449,10 @@ class Stled_vae_vq_V2(nn.Module):
         scale = width ** -0.5
         self.emb_dim=emb_dim   #设置信息瓶颈，使编码器和解码器不能顺利沟通，第二阶段也可以在这边量化时候。求近似值，可能也会方便些？误差会小
         self.positional_embedding = nn.Parameter(scale * torch.randn(257, width))
-        self.V2 = nn.Parameter(scale * torch.randn(8192,emb_dim))######V2版本独有的
         self.query_embedding = nn.Parameter(scale * torch.randn(36, width))
         self.ln_ecoder_1 = LayerNorm(width)
         self.ln_before_project_ = LayerNorm(width)
-        self.ln_cosin = LayerNorm(emb_dim)
-        #self.quantize = VectorQuantizer(194560,emb_dim)
+        self.quantize = VectorQuantizer(194560,emb_dim)
         self.class_embedding = nn.Parameter(scale * torch.randn(1, self.width))
         self.resblocks = nn.ModuleList([
             ResidualAttentionBlock(width, heads, mlp_ratio, act_layer=act_layer)
@@ -517,6 +467,8 @@ class Stled_vae_vq_V2(nn.Module):
         #self.progject_std= nn.Linear(width, self.emb_dim)
         self.afer_progject= nn.Linear(self.emb_dim, self.decoder_dim)##升维度，也可以作为连续值用作理解任务，经过升维后才送入解码器
         self.decoder=vit_32768_decoder(width=self.decoder_dim,sd3=1)
+        self.V2 = nn.Parameter(scale * torch.randn(8192,emb_dim))######V2版本独有的
+        self.ln_cosin = LayerNorm(emb_dim)
         self.patch_embed = nn.Conv2d(
             in_channels=3, out_channels=self.width,
               kernel_size=16, stride=16, bias=True)
@@ -553,12 +505,19 @@ class Stled_vae_vq_V2(nn.Module):
         return x.float()
     def forward(self,img,quantize=False):
         with torch.cuda.amp.autocast(True):
-            feature=self.encoder_forward(img)
+            #with torch.no_grad():
+                feature=self.encoder_forward(img)
+        if quantize:
+            feature,_=self.quantize(feature.float())
         with torch.cuda.amp.autocast(True):
-            after_project = self.afer_progject(feature)#
-        return self.decoder_forward(after_project)#
+            after_project = self.afer_progject(feature)#   36 bs  128        下面的需要修改
+        return self.decoder_forward(after_project),0#sd是0.000001 #轻微的控制下方差
+    # def forward(self,img):
+    #     #抽取特征时候用的
+    #     return self.encoder_forward(img)#sd是0.000001 #轻微的控制下方差
     def decoder_infer(self, condtion: torch.Tensor):
         x=self.decoder(condtion)
+        #  这里面的形状应该为256 bs  width
         return x.float()
     def encoder_infer(self, x: torch.Tensor, attn_mask: Optional[torch.Tensor] = None):
         x = self.patch_embed(x)#ze([12, 768, 16, 16])
@@ -577,17 +536,19 @@ class Stled_vae_vq_V2(nn.Module):
             x = checkpoint(r, x, attn_mask)####### self.attn_mask
         x=self.ln_before_project_ (x)  #之前忘记加了
         origin_dtype = x.dtype       
-        mu = F.normalize(self.progject_mean(x[257:]).float() , dim=-1)#这边才是要量化的！！量化使用余弦距离
+        mu=self.progject_mean(x[257:]) #这边才是要量化的！！量化使用余弦距离
         ###############V2,这边是为了减轻量化损失影响的！
         mu_flattened = mu.view(-1, 128)
-        b_normalized = F.normalize(self.V2.float())
-        similarity =  torch.matmul(mu_flattened.float(), b_normalized.t().float())
+        similarity = cosine_similarity(mu_flattened.float().unsqueeze(1), self.V2.float(), dim=2)
         similarity= similarity/torch.sum(similarity, dim=-1, keepdim=True)#线性加权，未使用softmax暂时没想好温控策略,这边也可以减少误差的影响,但是操作不当会增加
-        weighted_sum = self.ln_before_cosin(torch.matmul(similarity, self.V2))
+        weighted_sum = self.ln_cosin(torch.matmul(similarity, self.V2))
         output = weighted_sum.view(mu.shape)
-        ###############这边是为了减轻量化影响的, 保证含义是连续的,这样存在误差也无妨,本来就是总结图像，不指望他还原
         return output
     def infer(self,img,quantize=False):
+        ######这一版是连续的
         feature=self.encoder_infer(img)#.permute(1, 0, 2)
+        if quantize:
+            feature=self.quantize(feature.float())
+        
         after_project = self.afer_progject(feature)#.permute(1, 0, 2)   36 bs  128        下面的需要修改
         return self.decoder_infer(after_project)
