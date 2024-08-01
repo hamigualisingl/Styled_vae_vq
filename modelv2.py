@@ -7,7 +7,7 @@ from typing import Tuple, Union, Callable, Optional
 import numpy as np
 import torch
 from typing import Mapping, Text, Tuple
-
+from torch.nn.functional import cosine_similarity
 from einops import reduce
 import torch.nn.functional as F
 from torch import nn
@@ -379,8 +379,6 @@ class Styled_New_18Qvae_Block_stled(nn.Module):
             ("gelu", act_layer()),
             ("c_proj", nn.Linear(mlp_width, d_model))
         ]))
-        self.condation_1=nn.Linear(d_model,d_model)
-        self.condation_2=nn.Linear(d_model, d_model)
         self.ln_1=FP32LayerNorm(d_model, norm_eps, norm_elementwise_affine)
         self.ln_2=FP32LayerNorm(d_model, norm_eps, norm_elementwise_affine)
         self.norm2=AdaLayerNorm_stled(d_model, elementwise_affine=norm_elementwise_affine, eps=norm_eps)
@@ -389,9 +387,9 @@ class Styled_New_18Qvae_Block_stled(nn.Module):
         return self.attn(x, x, x, need_weights=False, attn_mask=attn_mask)[0]
        
     def forward(self, x: torch.Tensor,condation: torch.Tensor, index,attn_mask: Optional[torch.Tensor] = None):
-        norm_hidden_states = self.norm1(x,self.ln_1(self.condation_1(condation[0])))#调制  同时norm，解释在上面，第一个条件是经过前面条件的影响
+        norm_hidden_states = self.norm1(x,self.ln_1(condation[0]))#调制  同时norm，解释在上面，第一个条件是经过前面条件的影响
         x = x + self.attn1(norm_hidden_states, norm_hidden_states, norm_hidden_states, need_weights=False, attn_mask=attn_mask)[0]#([516, 516]) torch.float32
-        x = x + self.mlp(self.norm2(x,self.ln_2(self.condation_2(condation[1]))))#经过attention，第二个条件也被第一个条件影响了
+        x = x + self.mlp(self.norm2(x,self.ln_2(condation[1])))#经过attention，第二个条件也被第一个条件影响了
         return x
    
 class vit_32768_decoder(nn.Module):
@@ -414,7 +412,9 @@ class vit_32768_decoder(nn.Module):
         ])#
         self.lin_post = LayerNorm(width)
         self.pre_post = LayerNorm(width)
-        self.fc = nn.Linear(width, 1024)#####V2版本
+        self.before_fc=nn.Linear(width,256)
+        self.ln_before_fc = LayerNorm(256)
+        self.fc = nn.Linear(256,16384,bias=False)#####V2版本
     def forward(self, conditon: torch.Tensor, attn_mask: Optional[torch.Tensor] = None):
         x=self.positional_embedding.unsqueeze(1).repeat(1, conditon.shape[1], 1).to(conditon.dtype)
         x=self.pre_post(x)
@@ -424,7 +424,10 @@ class vit_32768_decoder(nn.Module):
         for index, r in enumerate(self.final_block):
             x = checkpoint(r, x, attn_mask)####256 bs 768
         x=self.lin_post(x)
-        x=self.fc(x)#
+        x=self.ln_before_fc(self.before_fc(x))
+        #print(f'hhhhhhh{x.shape}')#e([256, 2, 256])
+        x=self.fc(x).permute(1, 0, 2).reshape(-1,16,16,16384)#bs,256,16384
+        x=F.softmax(x.float(), dim=-1)
         return x
 
 class VisualTransformer(nn.Module):
@@ -494,10 +497,11 @@ class Stled_vae_vq_V2(nn.Module):
         scale = width ** -0.5
         self.emb_dim=emb_dim   #设置信息瓶颈，使编码器和解码器不能顺利沟通，第二阶段也可以在这边量化时候。求近似值，可能也会方便些？误差会小
         self.positional_embedding = nn.Parameter(scale * torch.randn(257, width))
-        self.V2 = nn.Parameter(scale * torch.randn(4096,emb_dim))######V2版本独有的
+        self.V2 = nn.Parameter(scale * torch.randn(8192,emb_dim))######V2版本独有的
         self.query_embedding = nn.Parameter(scale * torch.randn(36, width))
         self.ln_ecoder_1 = LayerNorm(width)
         self.ln_before_project_ = LayerNorm(width)
+        self.ln_cosin = LayerNorm(emb_dim)
         #self.quantize = VectorQuantizer(194560,emb_dim)
         self.class_embedding = nn.Parameter(scale * torch.randn(1, self.width))
         self.resblocks = nn.ModuleList([
@@ -532,16 +536,15 @@ class Stled_vae_vq_V2(nn.Module):
         for r in self.resblocks_exper:
             x = checkpoint(r, x, attn_mask)####### self.attn_mask
         x=self.ln_before_project_ (x)  #之前忘记加了
-        origin_dtype = x.dtype       
-        mu = F.normalize(self.progject_mean(x[257:]).float() , dim=-1)#这边才是要量化的！！量化使用余弦距离
+        origin_dtype = x.dtype      
+        mu=self.progject_mean(x[257:]) #这边才是要量化的！！量化使用余弦距离
         ###############V2,这边是为了减轻量化损失影响的！
         mu_flattened = mu.view(-1, 128)
-        b_normalized = F.normalize(self.V2.float())
-        similarity =  torch.matmul(mu_flattened.float(), b_normalized.t().float())
+        similarity = cosine_similarity(mu_flattened.float().unsqueeze(1), self.V2.float(), dim=2)
         similarity= similarity/torch.sum(similarity, dim=-1, keepdim=True)#线性加权，未使用softmax暂时没想好温控策略,这边也可以减少误差的影响,但是操作不当会增加
-        weighted_sum = torch.matmul(similarity, self.V2)
+        weighted_sum = self.ln_cosin(torch.matmul(similarity, self.V2))
         output = weighted_sum.view(mu.shape)
-        ###############这边是为了减轻量化影响的, 保证含义是连续的,这样存在误差也无妨,本来就是总结图像，不指望他还原
+        ###############这边是为了减轻量化影响的, 保证含义是连续的,这样存在误差也无妨,本来就是总结图像，不指望他还原,目前追求还原质量是担心链路太长,每个环节都差一些,不好找原因
         return     output.to(origin_dtype)
     def decoder_forward(self, condtion: torch.Tensor):
         with torch.cuda.amp.autocast(True):
@@ -552,8 +555,8 @@ class Stled_vae_vq_V2(nn.Module):
         with torch.cuda.amp.autocast(True):
             feature=self.encoder_forward(img)
         with torch.cuda.amp.autocast(True):
-            after_project = self.afer_progject(feature)#   36 bs  128        下面的需要修改
-        return self.decoder_forward(after_project),0#sd是0.000001 #轻微的控制下方差
+            after_project = self.afer_progject(feature)#
+        return self.decoder_forward(after_project)#
     def decoder_infer(self, condtion: torch.Tensor):
         x=self.decoder(condtion)
         return x.float()
@@ -580,10 +583,10 @@ class Stled_vae_vq_V2(nn.Module):
         b_normalized = F.normalize(self.V2.float())
         similarity =  torch.matmul(mu_flattened.float(), b_normalized.t().float())
         similarity= similarity/torch.sum(similarity, dim=-1, keepdim=True)#线性加权，未使用softmax暂时没想好温控策略,这边也可以减少误差的影响,但是操作不当会增加
-        weighted_sum = torch.matmul(similarity, self.V2)
+        weighted_sum = self.ln_before_cosin(torch.matmul(similarity, self.V2))
         output = weighted_sum.view(mu.shape)
         ###############这边是为了减轻量化影响的, 保证含义是连续的,这样存在误差也无妨,本来就是总结图像，不指望他还原
-        return     output.to(origin_dtype)
+        return output
     def infer(self,img,quantize=False):
         feature=self.encoder_infer(img)#.permute(1, 0, 2)
         after_project = self.afer_progject(feature)#.permute(1, 0, 2)   36 bs  128        下面的需要修改
