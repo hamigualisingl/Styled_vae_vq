@@ -7,7 +7,7 @@ Author: lidehu 2201210265@stu.pku.edu.cn
 ## 变动部分：
 - 编码器输出特征部分:
     ```
-       #self.V2 = nn.Parameter(scale * torch.randn(self.emb_dim,emb_dim))######V2版本独有的,128个够用了,可以看做一个连接层
+       #self.V2 = nn.Parameter(scale * torch.randn(self.emb_dim,emb_dim))######V2版本独有的,可以看做一个连接层
         mu=self.progject_mean(x[257:]) #这边才是要量化的！！量化使用余弦距离
         ###############V2,这边是为了第二阶段减轻量化损失影响的！
         mu_flattened = mu.view(-1, 128)
