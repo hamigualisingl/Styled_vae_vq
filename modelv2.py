@@ -469,7 +469,7 @@ class VQVAE_Transformer_vit_sd3_hug_4096(nn.Module):
         #self.progject_std= nn.Linear(width, self.emb_dim)
         self.afer_progject= nn.Linear(self.emb_dim, self.decoder_dim)##升维度，也可以作为连续值用作理解任务，经过升维后才送入解码器
         self.decoder=vit_32768_decoder(width=self.decoder_dim,sd3=1)
-        self.V2 = nn.Parameter(scale * torch.randn(1024,emb_dim))######V2版本独有的
+        self.V2 = nn.Parameter(scale * torch.randn(128,emb_dim))######V2版本独有的,128够用了,可以看做一个链接层,得到相似度矩阵可以看做过一个连接层
         self.ln_cosin = LayerNorm(emb_dim)
         self.patch_embed = nn.Conv2d(
             in_channels=3, out_channels=self.width,
