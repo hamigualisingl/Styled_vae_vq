@@ -19,6 +19,14 @@ Author: lidehu 2201210265@stu.pku.edu.cn
         return     output
     ```
 - 解码器部分:去掉了占位token,现在还在像素级别回归,未来目标(暂时没找到合适的vqgan):(条件只做自适应归一化,预测目标为vqgan编码出的序列,使用交叉熵,不直接回归像素,还可以调控下温控系数,减轻量化损失影响.
+   ```
+        #condation的形状为2,bs，d_models,x形状为256，bs,d_models
+        norm_hidden_states = self.norm1(x,self.ln_1(condation[0]))
+        x=torch.cat([torch.zeros(2, *x.shape[1:], device=x.device, dtype=x.dtype),x], dim=0)##条件先norm，然后参与交互
+        norm_hidden_states=torch.cat([self.ln_11(condation[0:1]),self.ln_22(condation[1:2]),norm_hidden_states], dim=0)#条件先交互后norm，
+        x = x + self.attn1(norm_hidden_states, norm_hidden_states, norm_hidden_states, need_weights=False, attn_mask=attn_mask)[0]# 
+        x = x + self.mlp(self.norm2(x,self.ln_2(condation[1])))
+   ```
 - 变动解释:给第二阶段添加容错机制. 新版本训练中.
 - ### Environment installation
 
