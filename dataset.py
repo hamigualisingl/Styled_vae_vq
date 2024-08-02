@@ -1,97 +1,61 @@
 import json
+import random
 import sys
 import os
-
+import numpy as np
+from torchvision.transforms import InterpolationMode, transforms
+import math
 import einops
 import torchvision
 from PIL import Image
+#    torch.utils.data.DataLoader
 from torch.utils.data import DataLoader, Dataset
 from torch.utils.data.distributed import DistributedSampler
 from torchvision import transforms
+def center_crop_arr(pil_image, image_size):
+    """
+    #(2560, 1440)->640,360
+    Center cropping implementation from ADM.
+    https://github.com/openai/guided-diffusion/blob/8fb3ad9197f16bbc40620447b2742e13458d2831/guided_diffusion/image_datasets.py#L126
+    """
+    while min(*pil_image.size) >= 2 * image_size:
+        pil_image = pil_image.resize(
+            tuple(x // 2 for x in pil_image.size), resample=Image.BOX
+        )
+    
+    scale = image_size / min(*pil_image.size)
+    pil_image = pil_image.resize(
+        tuple(round(x * scale) for x in pil_image.size), resample=Image.BICUBIC
+    )
+    #(455, 256)
+    arr = np.array(pil_image)#(256, 455, 3)
+    crop_y = (arr.shape[0] - image_size) // 2#0
+    crop_x = (arr.shape[1] - image_size) // 2
+    return Image.fromarray(arr[crop_y: crop_y + image_size, crop_x: crop_x + image_size])
+def random_crop_arr(pil_image, image_size, min_crop_frac=0.8, max_crop_frac=1.0):
+    min_smaller_dim_size = math.ceil(image_size / max_crop_frac)
+    max_smaller_dim_size = math.ceil(image_size / min_crop_frac)
+    smaller_dim_size = random.randrange(min_smaller_dim_size, max_smaller_dim_size + 1)
+    while min(*pil_image.size) >= 2 * smaller_dim_size:
+        pil_image = pil_image.resize(
+            tuple(x // 2 for x in pil_image.size), resample=Image.BOX
+        )
+    scale = smaller_dim_size / min(*pil_image.size)
+    pil_image = pil_image.resize(
+        tuple(round(x * scale) for x in pil_image.size), resample=Image.BICUBIC
+    )
 
-# Set this tp `True` and run this script to convert dataset to LMDB format
+    arr = np.array(pil_image)
+    crop_y = random.randrange(arr.shape[0] - image_size + 1)
+    crop_x = random.randrange(arr.shape[1] - image_size + 1)
+    return Image.fromarray(arr[crop_y : crop_y + image_size, crop_x : crop_x + image_size])
 TO_LMDB = False
-
-CC3M_595K_PATH = '/mnt/data/user/lidehu/lavis/CC3M_595K/images'
-file_path = '/mnt/data/user/lidehu/vae/filenames.json'
-
-
+CC3M_595K_PATH = '/mnt/data/user/lidehu/imagenet_data/lavis/CC3M_595K/ages'
+file_path = '/mnt/data/user/lidehu/vas.json'
 def normalize_01_into_pm1(x):  # normalize x from [0, 1] to [-1, 1] by (x*2) - 1
     return x.add(x).add_(-1)
   # 将PIL Image或者numpy.ndarray转换为Tensor
     # 应用自定义的归一化到[-1, 1]
-def download_mnist():
-    mnist = torchvision.datasets.MNIST(root='./data/mnist', download=True)
-    print('length of MNIST', len(mnist))
-    id = 4
-    img, label = mnist[id]
-    print(img)
-    print(label)
-
-    # On computer with monitor
-    # img.show()
-
-    img.save('work_dirs/tmp_mnist.jpg')
-    tensor = transforms.ToTensor()(img)
-    print(tensor.shape)
-    print(tensor.max())
-    print(tensor.min())
-
-
-class CelebADataset(Dataset):
-
-    def __init__(self, root, img_shape=(64, 64)):
-        super().__init__()
-        self.root = root
-        self.img_shape = img_shape
-        self.filenames = sorted(os.listdir(root))
-
-    def __len__(self) -> int:
-        return len(self.filenames)
-
-    def __getitem__(self, index: int):
-        path = os.path.join(self.root, self.filenames[index])
-        img = Image.open(path)
-        pipeline = transforms.Compose([
-            
-            transforms.Resize(self.img_shape),
-            transforms.ToTensor(), normalize_01_into_pm1
-        ])
-        return pipeline(img)
-
-
-if TO_LMDB:
-    from dldemos.lmdb_loader import ImageFolderLMDB
-
-    class CelebALMDBDataset(ImageFolderLMDB):
-
-        def __init__(self, path, img_shape=(64, 64)):
-            pipeline = transforms.Compose([
-                transforms.CenterCrop(256),
-                transforms.Resize(img_shape),
-                transforms.ToTensor(), normalize_01_into_pm1
-            ])
-            super().__init__(path, pipeline)
-
-
-class MNISTImageDataset(Dataset):
-
-    def __init__(self, img_shape=(28, 28)):
-        super().__init__()
-        self.img_shape = img_shape
-        self.mnist = torchvision.datasets.MNIST(root='./data/mnist')
-
-    def __len__(self):
-        return len(self.mnist)
-
-    def __getitem__(self, index: int):
-        img = self.mnist[index][0]
-        pipeline = transforms.Compose(
-            [transforms.Resize(self.img_shape),
-             transforms.ToTensor(), normalize_01_into_pm1])
-        return pipeline(img)
-
-
 class CC3MDataset(Dataset):
 
     def __init__(self, root, img_shape=(256, 256)):
@@ -101,24 +65,36 @@ class CC3MDataset(Dataset):
         #self.filenames = sorted([f for f in os.listdir(root) if os.path.isfile(os.path.join(root, f)) and f.lower().endswith(('.jpg', '.jpeg', '.png'))])
         # with open(file_path, 'r') as f:
         #     self.filenames = json.load(f)
-
-        with open("/mnt/data/user/lidehu/vae/filenames.json", 'r') as f:
+       ######可以提取前准备好数据路径
+        with open("/mnt/data/user/lidehu/vae/z_finale_merged_filenames.json", 'r') as f:
             self.filenames = json.load(f)
 
     def __len__(self) -> int:
         return len(self.filenames)
 
     def __getitem__(self, index: int):
-        path = os.path.join(self.root, self.filenames[index])
-        img = Image.open(path).convert('RGB')
-        pipeline = transforms.Compose([
-            transforms.Resize(self.img_shape),
-           # transforms.RandomResizedCrop(256), 
-            transforms.ToTensor(), normalize_01_into_pm1
-        ])
-        return pipeline(img)
-
-
+     #########添加异常判断
+        while True:
+            try:
+                path = self.filenames[index]
+                img = Image.open(path).convert('RGB')
+                if img.size == (224, 224):
+                    pipeline = transforms.Compose([
+                transforms.Resize(self.img_shape),
+                transforms.ToTensor(),
+                #normalize_01_into_pm1#v
+                transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5], inplace=True)#V2
+            ])
+                else:
+                    pipeline = transforms.Compose([
+                  transforms.Lambda(lambda pil_image: random_crop_arr(pil_image, 256)),
+                  transforms.ToTensor(),
+                    #normalize_01_into_pm1#v
+                transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5], inplace=True)#V2
+    ])
+                return pipeline(img)
+            except Exception as e:
+                index = random.randint(0, len(self.filenames) - 1)
 def get_dataloader(type,
                    batch_size,
                    img_shape=None,
@@ -126,32 +102,14 @@ def get_dataloader(type,
                    num_workers=16,
                    use_lmdb=False,
                    **kwargs):
-    if type == 'CelebA':
-        if img_shape is not None:
+    
+    
+    if img_shape is not None:
             kwargs['img_shape'] = img_shape
-        if use_lmdb:
-            dataset = CelebALMDBDataset(CELEBA_LMDB_PATH, **kwargs)
-        else:
-            dataset = CelebADataset(CELEBA_DIR, **kwargs)
-    elif type == 'CelebAHQ':
-        if img_shape is not None:
-            kwargs['img_shape'] = img_shape
-        if use_lmdb:
-            dataset = CelebALMDBDataset(CELEBA_HQ_LMDB_PATH, **kwargs)
-        else:
-            dataset = CelebADataset(CELEBA_HQ_DIR, **kwargs)
-    elif type == 'MNIST':
-        if img_shape is not None:
-            dataset = MNISTImageDataset(img_shape)
-        else:
-            dataset = MNISTImageDataset()
-    elif type == 'CC3M':
-        if img_shape is not None:
-            kwargs['img_shape'] = img_shape
-        if use_lmdb:
-            dataset = CC3MDataset(CC3M_595K_PATH, **kwargs)
-        else:
-            dataset = CC3MDataset(CC3M_595K_PATH, **kwargs)
+    if use_lmdb:
+        dataset = CC3MDataset(CC3M_595K_PATH, **kwargs)
+    else:
+        dataset = CC3MDataset(CC3M_595K_PATH, **kwargs)
 
     if dist_train:
         sampler = DistributedSampler(dataset)
@@ -167,42 +125,3 @@ def get_dataloader(type,
                                 num_workers=num_workers)
         return dataloader
 
-
-if __name__ == '__main__':
-    os.makedirs('work_dirs', exist_ok=True)
-
-    if os.path.exists(CELEBA_DIR):
-        dataloader = get_dataloader('CelebA', 16)
-        img = next(iter(dataloader))
-        print(img.shape)
-        N = img.shape[0]
-        img = einops.rearrange(img,
-                               '(n1 n2) c h w -> c (n1 h) (n2 w)',
-                               n1=int(N**0.5))
-        print(img.shape)
-        print(img.max())
-        print(img.min())
-        img = transforms.ToPILImage()(img)
-        img.save('work_dirs/tmp_celeba.jpg')
-        if TO_LMDB:
-            from dldemos.lmdb_loader import folder2lmdb
-            folder2lmdb(CELEBA_DIR, CELEBA_LMDB_PATH)
-
-    if os.path.exists(CELEBA_HQ_DIR):
-        dataloader = get_dataloader('CelebAHQ', 16)
-        img = next(iter(dataloader))
-        print(img.shape)
-        N = img.shape[0]
-        img = einops.rearrange(img,
-                               '(n1 n2) c h w -> c (n1 h) (n2 w)',
-                               n1=int(N**0.5))
-        print(img.shape)
-        print(img.max())
-        print(img.min())
-        img = transforms.ToPILImage()(img)
-        img.save('work_dirs/tmp_celebahq.jpg')
-        if TO_LMDB:
-            from dldemos.lmdb_loader import folder2lmdb
-            folder2lmdb(CELEBA_HQ_DIR, CELEBA_HQ_LMDB_PATH)
-
-    download_mnist()
