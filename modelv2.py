@@ -469,7 +469,7 @@ class VQVAE_Transformer_vit_sd3_hug_4096(nn.Module):
         #self.progject_std= nn.Linear(width, self.emb_dim)
         self.afer_progject= nn.Linear(self.emb_dim, self.decoder_dim)##升维度，也可以作为连续值用作理解任务，经过升维后才送入解码器
         self.decoder=vit_32768_decoder(width=self.decoder_dim,sd3=1)
-        self.V2 = nn.Parameter(scale * torch.randn(4096,emb_dim))######V2版本独有的
+        self.V2 = nn.Parameter(scale * torch.randn(1024,emb_dim))######V2版本独有的
         self.ln_cosin = LayerNorm(emb_dim)
         self.patch_embed = nn.Conv2d(
             in_channels=3, out_channels=self.width,
@@ -495,7 +495,7 @@ class VQVAE_Transformer_vit_sd3_hug_4096(nn.Module):
         ###############V2,这边是为了减轻量化损失影响的！
         mu_flattened = mu.view(-1, 128)
         similarity = cosine_similarity(mu_flattened.float().unsqueeze(1), self.V2.float(), dim=2)
-        similarity= similarity/torch.sum(similarity, dim=-1, keepdim=True)#线性加权，未使用softmax暂时没想好温控策略,这边也可以减少误差的影响,但是操作不当会增加误差
+        #线性加权，未使用softmax暂时没想好温控策略,这边也可以减少误差的影响,但是操作不当会增加误差
         weighted_sum = self.ln_cosin(torch.matmul(similarity, self.V2))
         output = weighted_sum.view(mu.shape)
         ###############这边是为了减轻量化影响的, 保证含义是连续的,这样存在误差也无妨,本来就是总结图像，不指望他还原,目前追求还原质量是担心链路太长,每个环节都差一些,不好找原因
