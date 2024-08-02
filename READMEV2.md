@@ -11,7 +11,7 @@ Author: lidehu 2201210265@stu.pku.edu.cn
         ###############V2,这边是为了第二阶段减轻量化损失影响的！
         mu_flattened = mu.view(-1, 128)
         similarity = cosine_similarity(mu_flattened.float().unsqueeze(1), self.V2.float(), dim=2)
-        similarity= similarity/torch.sum(similarity, dim=-1, keepdim=True)#线性加权，未使用softmax暂时没想好温控策略,这边也可以减少误差的影响,但是操作不当会增加
+        #线性加权，未使用softmax暂时没想好温控策略,这边也可以减少误差的影响,但是操作不当会增加
         weighted_sum = self.ln_cosin(torch.matmul(similarity, self.V2))
         output = weighted_sum.view(mu.shape)
         ###############这边是为了减轻量化影响的, 保证含义是连续的,这样存在误差也无妨,本来就是总结图像，不指望他还原,目前追求还原质量是担心链路太长,每个环节都差一些,不好找原因
