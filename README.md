@@ -22,7 +22,8 @@ Author: lidehu 2201210265@stu.pku.edu.cn
         x = checkpoint(r, x, attn_mask)#最后6层使用了专家,每层37个专家,一个属性一个专家
     mu=self.progject_mean(x[257:]) #降维度,制造信息瓶颈,第二阶段需要量化的值也是这个
     ################################################################################
-    mu_flattened = mu.view(-1, 128)#其中 self.V2 = nn.Parameter(scale * torch.randn(self.emb_dim,self.emb_dim))#可以看做一个连接层
+    mu_flattened = mu.view(-1, 128)
+    #其中 self.V2 = nn.Parameter(scale * torch.randn(self.emb_dim,self.emb_dim))#可以看做一个连接层
     similarity = cosine_similarity(mu_flattened.float().unsqueeze(1), self.V2.float(), dim=2)+1
     similarity= similarity/torch.sum(similarity, dim=-1, keepdim=True)#线性加权，未使用softmax暂时没想好温控策略,这边也可以减少误差的影响,但是操作不当会增加误差
     weighted_sum = self.ln_cosin(torch.matmul(similarity, self.V2))
