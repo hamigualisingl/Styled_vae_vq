@@ -28,15 +28,15 @@ Author: lidehu 2201210265@stu.pku.edu.cn
     similarity= similarity/torch.sum(similarity, dim=-1, keepdim=True)#线性加权，未使用softmax暂时没想好温控策略,这边也可以减少误差的影响,但是操作不当会增加误差
     weighted_sum = self.ln_cosin(torch.matmul(similarity, self.V2))
     output = weighted_sum.view(mu.shape)
-     ###############这边是为了减轻第二阶段量化影响的, 保证值连续含义是连续的,这样存在误差也无妨,本来就是总结图像，不指望他还原,目前追求还原质量是担心链路太长,每个环节都差一些,不好找原因
+    ###############这边是为了减轻第二阶段量化影响的, 保证值连续含义是连续的,这样存在误差也无妨,本来就是总结图像，不指望他还原,目前追求还原质量是担心链路太长,每个环节都差一些,不好找原因
     ```
-- 解码器部分-条件添加方式如下:
+- 解码器部分-条件(编码器输出)添加方式如下:
     ```
     for index, r in enumerate(self.condtionTransformer):
         x = r(x,conditon[index*2:(index+1)*2], index)#每层添加俩个条件
     ```
     ```
-    norm_hidden_states = self.norm1(x,self.ln_1(condation[0]))
+    norm_hidden_states = self.norm1(x,self.ln_1(condation[0]))#自适应归一化
     x=torch.cat([torch.zeros(2, *x.shape[1:], device=x.device, dtype=x.dtype),x], dim=0)##条件先norm，然后参与交互
     norm_hidden_states=torch.cat([self.ln_11(condation[0:1]),self.ln_22(condation[1:2]),norm_hidden_states], dim=0)#条件先交互后norm，
     x = x + self.attn1(norm_hidden_states, norm_hidden_states, norm_hidden_states, need_weights=False, attn_mask=attn_mask)[0]#([516, 516]) torch.float32
