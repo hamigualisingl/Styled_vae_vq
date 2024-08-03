@@ -13,13 +13,13 @@ Author: lidehu 2201210265@stu.pku.edu.cn
 - 自监督通用视觉模型:目前方案存在粗粒度和细粒度不能很好兼容问题.还原图片/特征为代表的自监督方案细粒度理解能力强,但是整体理解偏弱,伪标签做有监督的训练方案整体理解能力强,但是细节处理偏弱.
 - 解决方案：提出图像语言:Styled_vae_vq,将图像按序离散成36个(根据压缩比确定)从高级到低级的属性token,编码器提供易对齐的有固定规则的序列,提供更优的输入输出映射关系.使用时候和其他视觉编码器拼接.
 - 插播:有愿意一起写论文的朋友吗,共一或者你通讯,本人写作水平有限. 
-- 旧版本:详情请见
+- 旧版本:详情请见https://github.com/hamigualisingl/Styled_vae_vq/blob/main/READMEV2.md
 
 ## 关键部分代码：
 - 编码器部分:
     ```
     for r in self.resblocks_exper:
-        x = checkpoint(r, x, attn_mask)#最后6层使用了专家,每层37个专家,直接根据位置直通
+        x = checkpoint(r, x, attn_mask)#最后6层使用了专家,每层37个专家,一个属性一个专家
     mu=self.progject_mean(x[257:]) #降维度,制造信息瓶颈,第二阶段需要量化的值也是这个
     ################################################################################
     mu_flattened = mu.view(-1, 128)#其中 self.V2 = nn.Parameter(scale * torch.randn(self.emb_dim,self.emb_dim))#可以看做一个连接层
