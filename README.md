@@ -7,37 +7,41 @@ Author: lidehu 2201210265@stu.pku.edu.cn
 ## 动机： 
 - 业务需求:需要根据聊天上下文,自发的生成图片,比如:聊天时候,a:我去过黄山,秋天去的,可漂亮了.b:巧了,我冬天去的,我还滑雪了呢,(发送对应生成的照片),我之前在长白山滑过雪(发送生成的照片,此时注意人物画像要一致),比黄山还要好玩些呢.a:哇,冬天的黄山真好看,还有云海哎(根据生成的图片做理解).所以我选取了自回归式生成与理解方案,完全的端到端多模态大模型.
 - 注意:此方案是用来总结图像的,细节方面是有欠缺的,对于生成而言,可以理解为它提供了很详细的'图像语言'描述,很多时候,人类是很难按照某种固定规律还不能太过琐碎方式去描述图像的,而且还需要很容易根据简单的语言文字描述去生成图像描述,详情见重建部分说明.
-- 与titok出发点不同,所以网络结构是不一样的,最初的解码器直接是扩大俩倍的stylegan2,所以这份工作起名style_vae_vq,此份工作在5月底展开,由于组内图像基础相当薄弱(正在转向),万事靠自己摸索,加上还有其他任务,所以进展缓慢.
-- 理解:目前视觉encoder输出token数量多,没有规律,llm关注重点偏移,出现幻觉;通俗来说,说话没有重点,没有规则逻辑.
-- 生成:数据不对齐(输入输出为一对n的映射关系),加上按照一维顺序预测下一个token,破坏了图像特性,token联系不够紧密,导致大部分情况下 下一个token预测,约束不足,概率分布比较平均,预测难度较大.(经实验普通的vqvae自回归生图方案,前面给足原图的多尺度小图token,是很容易生成原图的token的,但是直接生成小图token,存在多样性问题)
+- 与titok出发点不同,所以网络结构是不一样的,最初的解码器直接是扩大俩倍的stylegan2,所以这份工作起名style_vae_vq,与titok效果也不同.此份工作在5月底展开,由于组内图像基础相当薄弱(正在转向),万事靠自己摸索,加上还有其他任务,所以进展缓慢.
+- 理解:目前视觉encoder输出token数量多,没有规律,llm关注重点偏移,出现幻觉;通俗来说,说话没有重点,没有规则逻辑.(经过实验:titok也未观察出规律)
+- 生成:数据不对齐(输入输出为一对n的映射关系),加上按照一维顺序预测下一个token,token联系不够紧密,下一个token预测,映射关系依然很发散,概率分布比较平均,预测难度较大.(经实验普通的vqvae自回归生图方案,前面给足原图的多尺度小图token,是很容易生成原图的token的,但是直接生成小图token,存在多样性问题)
 - 自监督通用视觉模型:目前方案存在粗粒度和细粒度不能很好兼容问题.还原图片/特征为代表的自监督方案细粒度理解能力强,但是整体理解偏弱,伪标签做有监督的训练方案整体理解能力强,但是细节处理偏弱.
 - 解决方案：提出图像语言:Styled_vae_vq,将图像按序离散成36个(根据压缩比确定)从高级到低级的属性token,编码器提供易对齐的有固定规则的序列,提供更优的输入输出映射关系.使用时候和其他视觉编码器拼接.
-- 插播:有愿意一起写论文的朋友吗,共一或者你通讯,我负责实验,(秋招太忙了,一个人干不来)    
-- 最新进展:变动较大.详情见https://github.com/hamigualisingl/Styled_vae_vq/blob/main/READMEV2.md
+- 插播:有愿意一起写论文的朋友吗,共一或者你通讯,本人写作水平有限. 
+- 旧版本:详情请见
 
-## 模型结构
-- 编码器参数远大于解码器参数.
-- 编码器:1024维度.一个输入卷积层input_cov,256个位置token和36个特殊token,24层Transformer(18dense+6experts(每层37个专家)),末尾为投影层,输出128/64维度.
-- 解码器:768/512维度.256个位置token和36个占位token,18个condtionTransformer层,6层Transformer,输出卷积层out_cov.
-## 数据流动流程：
-- 编码器:img(bs,3,256,256)->input_cov(img)->(256,bs,1024)->add(256个位置token).
-->cat(x,36个特殊token)->Transformer->取出后36个token降维度至128/64(制造信息瓶颈)作为condtion.
-- 解码器:256个位置token+36个占位token->condtionTransformer->Transformer->取后256个token->out_cov->重建损失,感知损失.
-- 条件添加方式如下:
+## 关键部分代码：
+- 编码器部分:
+    ```
+    for r in self.resblocks_exper:
+        x = checkpoint(r, x, attn_mask)#最后6层使用了专家,每层37个专家,直接根据位置直通
+    mu=self.progject_mean(x[257:]) #降维度,制造信息瓶颈,第二阶段需要量化的值也是这个
+    ################################################################################
+    mu_flattened = mu.view(-1, 128)#其中 self.V2 = nn.Parameter(scale * torch.randn(self.emb_dim,self.emb_dim))#可以看做一个连接层
+    similarity = cosine_similarity(mu_flattened.float().unsqueeze(1), self.V2.float(), dim=2)+1
+    similarity= similarity/torch.sum(similarity, dim=-1, keepdim=True)#线性加权，未使用softmax暂时没想好温控策略,这边也可以减少误差的影响,但是操作不当会增加误差
+    weighted_sum = self.ln_cosin(torch.matmul(similarity, self.V2))
+    output = weighted_sum.view(mu.shape)
+     ###############这边是为了减轻第二阶段量化影响的, 保证值连续含义是连续的,这样存在误差也无妨,本来就是总结图像，不指望他还原,目前追求还原质量是担心链路太长,每个环节都差一些,不好找原因
+    ```
+- 解码器部分-条件添加方式如下:
     ```
     for index, r in enumerate(self.condtionTransformer):
         x = r(x,conditon[index*2:(index+1)*2], index)#每层添加俩个条件
     ```
     ```
-    zeros_like_x = torch.zeros_like(x)#(36+256,bs,dim)
-    zeros_like_x[index*2:(index+1)*2]=zeros_like_x[index*2:(index+1)*2]+ condation  #条件和占位token相加
-    x=x+ zeros_like_x  #条件和占位token相加,注意此时的占位token在前向过程中已经被之前的条件token影响.
-    norm_hidden_states = self.norm1(x,self.ln_1(self.condation_1(x[index*2])+condation[0]))#自适应归一化。条件token发挥作用前需要和占位token交互,这样后面条件token起什么作用受到前一个token牵扯
+    norm_hidden_states = self.norm1(x,self.ln_1(condation[0]))
+    x=torch.cat([torch.zeros(2, *x.shape[1:], device=x.device, dtype=x.dtype),x], dim=0)##条件先norm，然后参与交互
+    norm_hidden_states=torch.cat([self.ln_11(condation[0:1]),self.ln_22(condation[1:2]),norm_hidden_states], dim=0)#条件先交互后norm，
     x = x + self.attn1(norm_hidden_states, norm_hidden_states, norm_hidden_states, need_weights=False, attn_mask=attn_mask)[0]#([516, 516]) torch.float32
-    x = x + self.mlp(self.norm2(x,self.ln_2(self.condation_2(x[index*2+1])+condation[1])))
-       
+    x = x + self.mlp(self.norm2(x,self.ln_2(condation[1])))
     ```
-- 条件添加方案解释:整体添加方式类似于stylegan2的w+,相关stylegan2W+的分析不再赘述.为了进一步加强生成序列的纠缠关联有逻辑,和促使36个token,是从高到低的属性组合,使用了占位token.条件token需要与对应的占位token相加,而占位token到达本层时候,已经被前面的条件token改变,影响.因此如果36个token,是从低到高的属性组合,或者没有相关性,解码器复原图片变得很困难.比如:浓浓的眉毛属性影响到性别是男性,这个会给复原带来很大难度,但如果先指明这个人是男性然后影响眉毛属性,这就合理些.
+
 ## 训练流程
 - 由于任务比较困难,采取俩阶段训练策略,先获取合理的特征,然后量化,合理的特征会增强量化后序列间的逻辑.避免vqvae量化序列跳转困难(fsq更加突出),词表崩塌等问题-我们是要通过编码器得到一个合理的序列和特征,不能是依靠训一个强大的解码器拟合回去.
 - 阶段一:编码器输出连续值,添加噪音后送入解码器.参考最初的vae,可以适当添加kl_loss.#训练结束,效果参见重建部分.此部分已经训练结束.
