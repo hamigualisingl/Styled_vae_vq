@@ -39,8 +39,8 @@ model_alip = VQVAE_Transformer_vit_sd3_hug_4096(width=1024, layers=24, heads=16,
 state_dict = get_state_dict(file_path)
 model_alip.load_state_dict(state_dict, strict=False)
 # 确保在推理前模型处于评估模式
-quantize_embedding_weights=torch.load('/mnt/data/user/lidehu/vae/ALIP/kmeans/k_means.pt')
-model_alip.quantize.embedding.weight.data.copy_(quantize_embedding_weights)
+#quantize_embedding_weights=torch.load('/mnt/data/user/lidehu/vae/ALIP/kmeans/k_means.pt')
+#model_alip.quantize.embedding.weight.data.copy_(quantize_embedding_weights)
 
 model_alip.to(device)  
 model_alip.eval()
