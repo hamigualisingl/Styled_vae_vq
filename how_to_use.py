@@ -37,7 +37,7 @@ epoch_number =11#/mnt/data/user/lidehu/vae/ALIP/out_put_stage1_6expert_std_noise
 file_path = "/mnt/data/user/lidehu/vae/ALIP/out_put_1060w_noise0.0005_l2/model_{:d}.pt".format(epoch_number)
 model_alip = VQVAE_Transformer_vit_sd3_hug_4096(width=1024, layers=24, heads=16, mlp_ratio=4.0,emb_dim=128)
 state_dict = get_state_dict(file_path)
-model_alip.load_state_dict(state_dict, strict=False)
+model_alip.load_state_dict(state_dict, strict=True)
 # 确保在推理前模型处于评估模式
 #quantize_embedding_weights=torch.load('/mnt/data/user/lidehu/vae/ALIP/kmeans/k_means.pt')
 #model_alip.quantize.embedding.weight.data.copy_(quantize_embedding_weights)
