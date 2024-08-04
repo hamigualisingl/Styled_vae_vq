@@ -58,7 +58,7 @@ Author: lidehu 2201210265@stu.pku.edu.cn
 
 - ### Pretrained Model Weight
 
-    数据集: YFCC15M(随机挑选7.3M)+3.3M(混杂数据集)(最初实验在330w数据规模训练,对应噪音比例也增大,在YFCC15M测试,重建效果挺不错,所以最终版本只在1060w数据规模训练).超参数:lr 1e-4;12epoch(资源限制);bs 16*64;optim.AdamW,lr_scheduler "cosine".有多个版本,解码器有俩个版本(768/512),编码器有俩个版本(输出128/64).[Google Drive](https://drive.google.com/file/d/1IO_RgGXrjLhUlhmRHwCmeIoNVH6jMGab/view?usp=sharing)(旧版本:768,128)
+    数据集: YFCC15M(随机挑选7.3M)+3.3M(混杂数据集)(最初实验在330w数据规模训练,在YFCC15M测试,重建效果挺不错,所以最终版本只在1060w数据规模训练).超参数:lr 1e-4;12epoch(资源限制);bs 16*64;optim.AdamW,lr_scheduler "cosine".有多个版本,解码器有俩个版本(768/512),编码器有俩个版本(输出128/64).[Google Drive](https://drive.google.com/file/d/1IO_RgGXrjLhUlhmRHwCmeIoNVH6jMGab/view?usp=sharing)(旧版本:768,128)
 
 - ### Training
 
