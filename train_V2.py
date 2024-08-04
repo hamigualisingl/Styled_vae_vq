@@ -103,7 +103,7 @@ def main():
     opt = torch.optim.AdamW(
         params=[{"params": model_alip.parameters()}],#第一阶段的
         lr=args.lr, weight_decay=args.weight_decay, betas=(args.beta1, args.beta2))
-     ###########恒定学习率
+     
     if args.lr_scheduler == "cosine":
         assert isinstance(args.epochs, int)
         lr_scheduler = optim.lr_scheduler.OneCycleLR(
@@ -120,7 +120,7 @@ def main():
             total_iters=int(args.epochs * steps_per_epoch))
     else:
         raise
-    ######恒定学习率
+    
     callback_func = SpeedCallBack(5, steps_total, args.batch_size)
     auto_scaler = torch.cuda.amp.grad_scaler.GradScaler(growth_interval=200)
     start_epoch = 0
