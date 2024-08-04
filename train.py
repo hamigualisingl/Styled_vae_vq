@@ -101,21 +101,12 @@ def main():
     torch.distributed.barrier()
     # quantize_params = list(model_alip.module.quantize.parameters())#quantize
     # #/mnt/data/user/lidehu/vae/ALIP/out_put_vit_sd3_hug4_stylegan_2e_4_aul_loss100v2用的这个，但是他的aul_loss没有✖️0.001
-    # base_params = [param for name, param in model_alip.module.named_parameters() if "quantize" not in name]
-    # optimizer_sgd = optim.SGD(quantize_params, lr=args.lr, momentum=0.9)
-    # decoder_params = [p for name, p in model_alip.module.named_parameters() if name.startswith('decoder.')]
-    # encoder_params = [p for name, p in model_alip.module.named_parameters() if not name.startswith('decoder.')]
-    # opt = torch.optim.AdamW(
-    #    base_params,
-    #     lr=args.lr, weight_decay=args.weight_decay, betas=(args.beta1, args.beta2))
+    
     opt = torch.optim.AdamW(
         params=[{"params": model_alip.parameters()}],
         lr=args.lr, weight_decay=args.weight_decay, betas=(args.beta1, args.beta2))
 
-    # opt = torch.optim.AdamW([
-    #  {"params": decoder_params, "lr": args.lr},
-    #  {"params": encoder_params, "lr": 10.0*args.lr}
-    #   ], weight_decay=args.weight_decay, betas=(args.beta1, args.beta2))
+    
     
     if args.lr_scheduler == "cosine":
         assert isinstance(args.epochs, int)
