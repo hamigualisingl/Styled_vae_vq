@@ -20,7 +20,7 @@ Author: lidehu 2201210265@stu.pku.edu.cn
         x = checkpoint(r, x, attn_mask)#最后6层使用了专家,每层37个专家,一个属性一个专家
     mu=self.progject_mean(x[257:]) #降维度,制造信息瓶颈,第二阶段需要量化的值也是这个,计算余弦距离
     ################################################################################
-    mu_flattened = mu.view(-1, 128)
+    mu_flattened = mu.view(-1, self.emb_dim)
     similarity = cosine_similarity(mu_flattened.float().unsqueeze(1), self.V2.float(), dim=2)+1
     #其中 self.V2 = nn.Parameter(scale * torch.randn(self.emb_dim,self.emb_dim))#可以看做一个连接层
     similarity= similarity/torch.sum(similarity, dim=-1, keepdim=True)#线性加权，未使用softmax暂时没想好温控策略,这边也可以减少误差的影响,但是操作不当会增加误差
@@ -57,7 +57,7 @@ Author: lidehu 2201210265@stu.pku.edu.cn
 
 - ### Pretrained Model Weight
 
-    数据集: YFCC15M(随机挑选7.3M)+3.3M(混杂数据集)(最初实验在330w数据规模训练,在YFCC15M测试,重建效果挺不错,所以最终版本只在1060w数据规模训练).超参数:lr 1e-4;12epoch(资源限制);bs 16*64;optim.AdamW,lr_scheduler "cosine".有多个版本,解码器有俩个版本(768/512),编码器有俩个版本(输出128/64).[Google Drive](https://drive.google.com/file/d/1IO_RgGXrjLhUlhmRHwCmeIoNVH6jMGab/view?usp=sharing)(旧版本:768,128)
+    数据集: YFCC15M(随机挑选7.3M)+3.3M(混杂数据集)(最初实验在330w数据规模训练,在YFCC15M测试,重建效果挺不错,所以最终版本只在1060w数据规模训练).超参数:lr 1e-4;12epoch(资源限制);bs 16*64;optim.AdamW,lr_scheduler "cosine".有多个版本,解码器有俩个版本(768/512),编码器有俩个版本(输出128/64).[Google Drive](https://drive.google.com/file/d/1IO_RgGXrjLhUlhmRHwCmeIoNVH6jMGab/view?usp=sharing)(版本:768,128)
 
 - ### Training
 
