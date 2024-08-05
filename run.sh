@@ -22,7 +22,7 @@ megatron_options=" \
     "
         
 
-run_cmd="torchrun $DISTRIBUTED_ARGS /mnt/data/user/lidehu/vae/ALIP/train.py
+run_cmd="torchrun $DISTRIBUTED_ARGS /mnt/data/user/lidehu/vae/ALIP/trainV2.py
  ${megatron_options}"
 
 echo ${run_cmd}
