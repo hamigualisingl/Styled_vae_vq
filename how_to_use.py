@@ -6,7 +6,7 @@ import os
 from PIL import Image
 # from models.vqvae import VQVAE
 from dataset import center_crop_arr
-from model import VQVAE_Transformer_vit_sd3_hug_4096
+from modelV2 import VQVAE_Transformer_vit_sd3_hug_4096
 from torchvision.transforms import InterpolationMode, transforms
 from torchvision import transforms
 def normalize_01_into_pm1(x):  # normalize x from [0, 1] to [-1, 1] by (x*2) - 1
@@ -33,14 +33,14 @@ val_aug321w = transforms.Compose([
                   normalize_01_into_pm1
     ])
 device =  'cuda'
-epoch_number =11#/mnt/data/user/lidehu/vae/ALIP/out_put_stage1_6expert_std_noise_0.1_pect_1/model_60.pt
-file_path = "/mnt/data/user/lidehu/vae/ALIP/out_put_1060w_noise0.0005_l2/model_{:d}.pt".format(epoch_number)
+epoch_number =8#/mnt/data/user/lidehu/vae/ALIP/out_put_stage1_6expert_std_noise_0.1_pect_1/model_60.pt
+file_path = "/mnt/data/user/lidehu/vae/ALIP/out_put_V2/model_{:d}.pt".format(epoch_number)
 model_alip = VQVAE_Transformer_vit_sd3_hug_4096(width=1024, layers=24, heads=16, mlp_ratio=4.0,emb_dim=128)
 state_dict = get_state_dict(file_path)
-model_alip.load_state_dict(state_dict, strict=True)
+model_alip.load_state_dict(state_dict, strict=False)
 # 确保在推理前模型处于评估模式
-#quantize_embedding_weights=torch.load('/mnt/data/user/lidehu/vae/ALIP/kmeans/k_means.pt')
-#model_alip.quantize.embedding.weight.data.copy_(quantize_embedding_weights)
+# quantize_embedding_weights=torch.load('/mnt/data/user/lidehu/vae/ALIP/kmeans/k_means.pt')
+# model_alip.quantize.embedding.weight.data.copy_(quantize_embedding_weights)
 
 model_alip.to(device)  
 model_alip.eval()
@@ -63,7 +63,7 @@ for i in range(len(image_path)):
         image.save(original_output_path, format='JPEG')
         print(f"Original image saved at {original_output_path}")
         img = val_aug321w(image).unsqueeze(0).to(device) 
-    reconstructed_images=model_alip.infer(img)#(260, 4, 96) 因为只取的最后的,注意！！！！是使用的哪个版本的权重,别搞错了
+    reconstructed_images=model_alip.infer(img)#(260, 4, 96) 因为只取的最后的
     img=reconstructed_images.detach().add_(1).mul_(0.5)[0].squeeze(0)
                                                #因为是-1 到1 ，加1就是0-2 然后0-1                      #修改这里，可以选择保存哪张图片
 #img=vae.idxBl_to_img(idxbl,True,last_one=True).add_(1).mul_(0.5).squeeze(0)
