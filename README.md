@@ -31,7 +31,7 @@ Author: lidehu 2201210265@stu.pku.edu.cn
 - 解码器部分-条件(编码器输出)添加方式如下:
     ```
     for index, r in enumerate(self.condtionTransformer):
-        x = r(x,conditon[index*2:(index+1)*2], index)#每层添加俩个条件
+        x = checkpoint(r, x,conditon[index*2:(index+1)*2], index)#每层添加俩个条件
     ```
     ```
     norm_hidden_states = self.norm1(x,self.ln_1(condation[0]))#自适应归一化
