@@ -63,7 +63,7 @@ for i in range(len(image_path)):
         image.save(original_output_path, format='JPEG')
         print(f"Original image saved at {original_output_path}")
         img = val_aug321w(image).unsqueeze(0).to(device) 
-    reconstructed_images=model_alip.infer(img)#(260, 4, 96) 因为只取的最后的
+    reconstructed_images=model_alip.infer(img)
     img=reconstructed_images.detach().add_(1).mul_(0.5)[0].squeeze(0)
                                                #因为是-1 到1 ，加1就是0-2 然后0-1                      #修改这里，可以选择保存哪张图片
 #img=vae.idxBl_to_img(idxbl,True,last_one=True).add_(1).mul_(0.5).squeeze(0)
